@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/settings.py -> repo root is three levels up
@@ -26,6 +27,15 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://typing:typing@localhost:5432/typing"
     redis_url: str = "redis://localhost:6379/0"
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_asyncpg_driver(cls, value: str) -> str:
+        """Hosts hand out `postgresql://` URLs; SQLAlchemy's async engine needs `+asyncpg`."""
+        for prefix in ("postgresql://", "postgres://"):
+            if value.startswith(prefix):
+                return "postgresql+asyncpg://" + value[len(prefix) :]
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:
