@@ -1,9 +1,11 @@
+# Rendered at container start: the nginx image substitutes ${PORT} (and only PORT)
+# into /etc/nginx/conf.d/default.conf. Hosts inject their own port; default is 80.
 server {
-    listen 80;
+    listen ${PORT};
     root /usr/share/nginx/html;
     index index.html;
 
-    # Single-page app: every unknown path serves index.html so React Router can handle it.
+    # Single-page app: every unknown path serves index.html so the router can handle it.
     location / {
         try_files $uri $uri/ /index.html;
     }
