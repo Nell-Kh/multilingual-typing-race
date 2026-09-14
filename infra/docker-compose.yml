@@ -1,0 +1,76 @@
+# Local development stack. Run from the repo root:
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# Service hostnames (db, redis, api) are resolvable between containers, so the
+# API talks to "db:5432" and "redis:6379", while your browser talks to
+# localhost:8000 and localhost:5173.
+
+name: typing-race
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: typing
+      POSTGRES_PASSWORD: typing
+      POSTGRES_DB: typing
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U typing -d typing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ../backend
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      # Override the localhost URLs from .env with the in-network hostnames.
+      DATABASE_URL: postgresql+asyncpg://typing:typing@db:5432/typing
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the source so code edits reload without rebuilding the image.
+      - ../backend/app:/srv/app:ro
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      target: dev
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app
+      # Keep the image's node_modules; don't shadow it with the host folder.
+      - /app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  db_data:
