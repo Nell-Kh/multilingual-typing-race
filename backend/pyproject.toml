@@ -11,6 +11,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.32",
     "asyncpg>=0.29",
     "redis>=5.0",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +33,9 @@ include = ["app*"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "db: needs a reachable PostgreSQL (skipped automatically when there is none)",
+]
 
 [tool.ruff]
 line-length = 100

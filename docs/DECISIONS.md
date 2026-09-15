@@ -64,3 +64,16 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - `Settings` rewrites `postgresql://` and `postgres://` to `postgresql+asyncpg://`, so the host's URL works unchanged. Unit-tested.
   - The frontend's API URL is baked in at build time via the `VITE_API_URL` build argument.
 - **Consequences:** No host-specific code paths beyond config. Changing the api's public URL requires rebuilding the frontend, which is acceptable while both are on one platform; a runtime-config file would be the fix if that ever changes.
+
+## ADR-008: Database conventions
+
+- **Date:** 2026-09-15 · **Status:** accepted
+- **Context:** The first tables (`users`, `texts`) fix conventions every later table will follow, and getting them wrong is expensive once data exists.
+- **Decision:**
+  - **UUID primary keys**, defaulted both in Python (`uuid4`) and in PostgreSQL (`gen_random_uuid()`). User ids appear in URLs, and sequential integers would let anyone count and enumerate accounts.
+  - **Enums stored as VARCHAR with a CHECK constraint** (`native_enum=False`), not native PostgreSQL enum types. Adding a language later is then an ordinary migration instead of an `ALTER TYPE`.
+  - **Constraint naming convention** set on the shared `MetaData`, so every index, foreign key and check has a predictable name and Alembic can always alter or drop it.
+  - **Timestamps are `TIMESTAMPTZ`** defaulted by the database, never by the application clock.
+  - **Emails are stored lower-cased** by the application; the plain unique index is then effectively case-insensitive.
+  - **Migrations are the source of truth for the schema**, and a test asserts the models and the migrations agree (`tests/test_migrations.py`), so a model edit without a migration fails CI.
+- **Consequences:** Slightly larger indexes than integer keys, which is irrelevant at this scale. Schema drift is caught automatically. Integration tests run against a throwaway `<dbname>_test` database and skip when no PostgreSQL is reachable, so `pytest` still works on a laptop with nothing running.
