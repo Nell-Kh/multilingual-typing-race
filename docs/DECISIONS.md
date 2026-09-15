@@ -77,3 +77,24 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **Emails are stored lower-cased** by the application; the plain unique index is then effectively case-insensitive.
   - **Migrations are the source of truth for the schema**, and a test asserts the models and the migrations agree (`tests/test_migrations.py`), so a model edit without a migration fails CI.
 - **Consequences:** Slightly larger indexes than integer keys, which is irrelevant at this scale. Schema drift is caught automatically. Integration tests run against a throwaway `<dbname>_test` database and skip when no PostgreSQL is reachable, so `pytest` still works on a laptop with nothing running.
+
+## ADR-009: Auth design
+
+- **Date:** 2026-09-15 · **Status:** accepted
+- **Context:** M1 needs login that is safe to explain in an interview and works with the frontend and API on different hosts.
+- **Decision:**
+  - Passwords hashed with **argon2id**; never stored or logged in clear.
+  - **Access token**: JWT (HS256), 15 min, returned in the response body, sent as `Authorization: Bearer`. Stateless — verified by signature alone.
+  - **Refresh token**: JWT, 7 days, in an **httpOnly cookie** scoped to `/api/v1/auth` so browsers send it nowhere else. `SameSite=None; Secure` in prod (cross-host), `Lax` locally.
+  - Every refresh token's `jti` is stored in **Redis** with the token's TTL. Refresh **rotates** (old `jti` deleted atomically with `GETDEL`, new one issued), so a reused or stolen refresh token is rejected; logout deletes the `jti`.
+  - Register logs the user in (same response as login). Unknown email and wrong password return the identical 401.
+  - `JWT_SECRET` ≥ 32 chars, mandatory when `APP_ENV=prod`; the app refuses to start without it.
+  - One error shape for every failure: `{"error": {"code", "message"}}`.
+- **Consequences:** No server-side session table; only refresh ids live in Redis. Losing Redis logs everyone out at their next refresh (acceptable). The prod-secret guard is deliberately fatal: it took the API down when PR #8 was merged before the variable was set — the fix is to set the variable, not to soften the guard. Rate limiting on auth endpoints is deferred to the M6 security pass.
+
+## ADR-010: Migrations run as a Railway pre-deploy command
+
+- **Date:** 2026-09-15 · **Status:** accepted (replaces the `deploy.yml` idea in ADR-004)
+- **Context:** Every deploy of new code that touches the schema must apply migrations first, exactly once.
+- **Decision:** The `api` service's Railway **Pre-Deploy Command** is `alembic upgrade head`. Railway runs it in the new image before swapping traffic; if it fails, the old version keeps serving. Locally, `docker compose` runs the same command before starting uvicorn.
+- **Consequences:** No GitHub Actions deploy workflow needed. The migration files must ship in the image (they do: `COPY alembic ./alembic`). A migration that fails leaves prod on the previous version and shows the error in Railway's deploy logs.
