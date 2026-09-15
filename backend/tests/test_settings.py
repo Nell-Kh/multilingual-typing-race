@@ -31,3 +31,17 @@ def test_cors_origins_splits_on_commas_and_trims() -> None:
     settings = Settings(cors_origins="https://a.example , https://b.example")
 
     assert settings.cors_origin_list == ["https://a.example", "https://b.example"]
+
+
+def test_prod_refuses_the_default_jwt_secret() -> None:
+    with pytest.raises(ValueError, match="JWT_SECRET"):
+        Settings(app_env="prod")
+
+
+def test_prod_accepts_a_real_jwt_secret() -> None:
+    assert Settings(app_env="prod", jwt_secret="x" * 32).jwt_secret == "x" * 32
+
+
+def test_short_jwt_secret_is_rejected_everywhere() -> None:
+    with pytest.raises(ValueError, match="at least 32"):
+        Settings(jwt_secret="too-short")
