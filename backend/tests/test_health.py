@@ -4,13 +4,15 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.api import health
-from app.main import app, lifespan
+from app.core.settings import Settings
+from app.main import create_app, lifespan
 
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
     # ASGITransport calls the app in-process (no server, no network) but does NOT
     # run startup/shutdown, so we enter the lifespan ourselves to populate app.state.
+    app = create_app(Settings(app_env="test"))
     async with lifespan(app):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c
