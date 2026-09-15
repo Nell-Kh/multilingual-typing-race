@@ -4,21 +4,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.api import health
 from app.core.settings import get_settings
+from app.db.session import create_engine, create_session_factory
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Runs once at startup (before the yield) and once at shutdown (after it)."""
     settings = get_settings()
-    app.state.engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    engine = create_engine()
+    app.state.engine = engine
+    app.state.session_factory = create_session_factory(engine)
     app.state.redis = Redis.from_url(settings.redis_url, socket_connect_timeout=2)
     yield
     await app.state.redis.aclose()
-    await app.state.engine.dispose()
+    await engine.dispose()
 
 
 def create_app() -> FastAPI:

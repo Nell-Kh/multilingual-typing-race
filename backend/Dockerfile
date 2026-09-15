@@ -17,6 +17,8 @@ WORKDIR /srv
 
 COPY --from=builder /opt/venv /opt/venv
 COPY app ./app
+COPY alembic ./alembic
+COPY alembic.ini ./
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
