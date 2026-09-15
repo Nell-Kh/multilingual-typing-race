@@ -98,3 +98,15 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
 - **Context:** Every deploy of new code that touches the schema must apply migrations first, exactly once.
 - **Decision:** The `api` service's Railway **Pre-Deploy Command** is `alembic upgrade head`. Railway runs it in the new image before swapping traffic; if it fails, the old version keeps serving. Locally, `docker compose` runs the same command before starting uvicorn.
 - **Consequences:** No GitHub Actions deploy workflow needed. The migration files must ship in the image (they do: `COPY alembic ./alembic`). A migration that fails leaves prod on the previous version and shows the error in Railway's deploy logs.
+
+## ADR-011: Cursor pagination and soft deletes
+
+- **Date:** 2026-09-15 · **Status:** accepted (closes the "M1: cursor pagination style" open decision)
+- **Context:** Admin lists (texts now; sessions and leaderboards later) need paging that stays correct while rows are being added, and texts will be referenced by typing sessions, so removing one must not orphan history.
+- **Decision:**
+  - **Keyset pagination** on `(created_at DESC, id DESC)`; the cursor is an opaque url-safe base64 of those two values. Clients pass it back as `?cursor=`; a malformed one is a 400 `invalid_cursor`. `limit` defaults to 20, max 100. Implemented once in `app/core/pagination.py`.
+  - **Soft delete**: `DELETE /admin/texts/{id}` sets `is_active=false`. Public endpoints only serve active texts; admins still see everything.
+  - `GET /texts/random` uses `ORDER BY random() LIMIT 1` — correct and simple for a corpus of hundreds; revisit only if it ever reaches millions.
+  - `content_normalized` and `char_count` are computed server-side from `content` on every create/update via `app/i18n/normalize.py`; clients never send them.
+  - Seed corpus: original sentences released CC0, imported by `python -m app.cli seed-texts`, idempotent (matched on normalized content). Admin promotion is a CLI command, not an endpoint.
+- **Consequences:** No offset paging anywhere. Deleted texts keep their ids forever. The English normalization rules live in one function that M3 extends for Hebrew and Arabic.
