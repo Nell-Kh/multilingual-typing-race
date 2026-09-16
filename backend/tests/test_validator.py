@@ -3,6 +3,7 @@ import pytest
 from app.services.typing_metrics import BACKSPACE, Keystroke
 from app.services.validator import (
     MACHINE_RUN_KEYS,
+    MIN_GAPS_FOR_MEDIAN,
     MIN_MEDIAN_GAP_MS,
     REVIEW_WPM,
     validate,
@@ -83,6 +84,33 @@ def test_inhumanly_fast_median_gap() -> None:
     assert validate(log, TARGET, wpm=999, client_duration_ms=duration(log)).reason == (
         "median_gap_too_low"
     )
+
+
+def test_median_check_needs_a_sample() -> None:
+    # A short text typed in a fast burst: too few gaps for a median to mean
+    # anything, so it is not rejected on that rule. (Still above the machine-run
+    # gap, so it is not a paste either.)
+    short = TARGET[:MIN_GAPS_FOR_MEDIAN]  # MIN_GAPS_FOR_MEDIAN keys -> one gap short
+    log = human(short, gap_ms=MIN_MEDIAN_GAP_MS - 1)
+
+    assert validate(log, short, wpm=400, client_duration_ms=duration(log)).valid
+
+    # One more key and the median rule applies.
+    longer = TARGET[: MIN_GAPS_FOR_MEDIAN + 1]
+    log = human(longer, gap_ms=MIN_MEDIAN_GAP_MS - 1)
+
+    assert validate(log, longer, wpm=400, client_duration_ms=duration(log)).reason == (
+        "median_gap_too_low"
+    )
+
+
+def test_a_pasted_short_text_is_still_caught() -> None:
+    # The machine-run rule is not gated on length: a paste of a short text
+    # arrives as a burst of keys with zero gaps.
+    short = TARGET[:12]
+    log = human(short, gap_ms=0)
+
+    assert validate(log, short, wpm=999, client_duration_ms=duration(log)).reason == ("machine_run")
 
 
 def test_pasted_burst_inside_a_human_session() -> None:

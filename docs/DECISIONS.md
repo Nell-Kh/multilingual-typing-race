@@ -144,3 +144,10 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - Invariants documented in `docs/rtl-notes.md`: identical font properties on every span, no `letter-spacing`, no `inline-block` per character.
   - The practice-text language is a picker on the practice page, remembered in `localStorage`; it is independent of the UI language.
 - **Consequences:** No second renderer to maintain, and the 17 engine tests plus the TypingBox tests cover all languages with one code path. A browser that does not shape across spans would show disconnected Arabic letters — acceptable given current browser support; the overlay design stays documented as the fallback if that ever changes.
+
+## ADR-015: The median-gap check needs a sample
+
+- **Date:** 2026-09-16 · **Status:** accepted (refines the validator rules in ADR-012)
+- **Context:** An external review pointed out that `median_gap_too_low` ran on any log length. A median of a handful of gaps is noise: a fast typist on a short Hebrew or Arabic text (fewer characters for the same content) could be rejected, and the failure would surface as a stored invalid row nobody understands.
+- **Decision:** The median rule applies only once there are at least 20 gaps (`MIN_GAPS_FOR_MEDIAN`). The machine-run rule (10 consecutive keys ≤ 5 ms apart) is deliberately **not** gated: it is about consecutive keys, not a statistic, and it is what catches a paste of a short text. The client-side `onPaste` block in `TypingBox` is a convenience, not a defence; the validator is.
+- **Consequences:** Two new tests pin the boundary (20 gaps skip, 21 apply) and prove a pasted 12-character text is still rejected. Corpus texts are all ≥ 30 characters, so in practice the median rule still runs on every seeded text.

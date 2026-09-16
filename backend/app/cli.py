@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.db.session import create_engine, create_session_factory
 from app.models import User, UserRole
-from app.seeds import en
+from app.seeds import ENTRIES
 from app.services.texts import upsert_seed
 
 
@@ -20,10 +20,10 @@ async def seed_texts(database_url: str | None = None) -> int:
     engine = create_engine(database_url)
     try:
         async with create_session_factory(engine)() as session:
-            added = await upsert_seed(session, en.ENTRIES)
+            added = await upsert_seed(session, ENTRIES)
     finally:
         await engine.dispose()
-    print(f"seed-texts: {added} added, {len(en.ENTRIES) - added} already present")
+    print(f"seed-texts: {added} added, {len(ENTRIES) - added} already present")
     return 0
 
 

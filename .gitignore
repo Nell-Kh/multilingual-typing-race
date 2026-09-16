@@ -37,3 +37,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# --- assistant working folders ---
+Claude outputs/
