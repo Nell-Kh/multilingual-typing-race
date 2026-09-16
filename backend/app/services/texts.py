@@ -46,8 +46,10 @@ async def list_texts(
 
 
 def _apply_content(text: Text, content: str) -> None:
-    text.content = content.strip()
+    # What you see is what you type (ADR-013): the display text *is* the typing
+    # target, so both columns hold the normalized form.
     text.content_normalized = normalize(content, text.language)
+    text.content = text.content_normalized
     text.char_count = len(text.content_normalized)
 
 
@@ -122,7 +124,7 @@ async def upsert_seed(
         session.add(
             Text(
                 language=language,
-                content=content.strip(),
+                content=normalized,
                 content_normalized=normalized,
                 char_count=len(normalized),
                 difficulty=difficulty,
