@@ -1,13 +1,7 @@
+@import "tailwindcss";
+
+/* Fonts per language arrive in M3 (Noto Sans / Noto Sans Hebrew / Noto Naskh Arabic). */
 :root {
   font-family: system-ui, sans-serif;
   color-scheme: light dark;
-}
-
-body {
-  margin: 0;
-  padding: 2rem;
-}
-
-code {
-  font-family: ui-monospace, monospace;
 }

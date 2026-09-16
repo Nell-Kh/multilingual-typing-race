@@ -1,47 +1,21 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { API_URL, getHealth, type HealthResponse } from './lib/api'
-
-type State = { kind: 'loading' } | { kind: 'ok'; data: HealthResponse } | { kind: 'error'; message: string }
+import { RouterProvider } from 'react-router'
+import { createRouter } from './app/router'
+import { useAuth } from './features/auth/store'
 
 export default function App() {
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [queryClient] = useState(() => new QueryClient())
+  const [router] = useState(() => createRouter())
+  const bootstrap = useAuth((s) => s.bootstrap)
 
   useEffect(() => {
-    let cancelled = false
-    getHealth()
-      .then((data) => {
-        if (!cancelled) setState({ kind: 'ok', data })
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    void bootstrap()
+  }, [bootstrap])
 
   return (
-    <main>
-      <h1>Multilingual Typing Race</h1>
-      <p>
-        API: <code>{API_URL}</code>
-      </p>
-      {state.kind === 'loading' && <p>Checking API…</p>}
-      {state.kind === 'error' && <p role="alert">API unreachable: {state.message}</p>}
-      {state.kind === 'ok' && (
-        <>
-          <p>
-            API status: <strong data-testid="status">{state.data.status}</strong>
-          </p>
-          <ul>
-            {Object.entries(state.data.checks).map(([name, result]) => (
-              <li key={name}>
-                {name}: {result}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
   )
 }
