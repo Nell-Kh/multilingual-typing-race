@@ -110,3 +110,16 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - `content_normalized` and `char_count` are computed server-side from `content` on every create/update via `app/i18n/normalize.py`; clients never send them.
   - Seed corpus: original sentences released CC0, imported by `python -m app.cli seed-texts`, idempotent (matched on normalized content). Admin promotion is a CLI command, not an endpoint.
 - **Consequences:** No offset paging anywhere. Deleted texts keep their ids forever. The English normalization rules live in one function that M3 extends for Hebrew and Arabic.
+
+## ADR-012: Typing engine and the server-as-judge rule
+
+- **Date:** 2026-09-16 · **Status:** accepted
+- **Context:** M2 needs a typing engine that produces a log the server can score and validate, works with real keyboards (mobile, IME), and can later render Hebrew/Arabic without breaking letter shaping.
+- **Decision:**
+  - **The engine is a pure reducer** (`frontend/src/features/typing-engine/engine.ts`): no DOM, no timers. It receives the whole input value on each change, diffs it against the previous value, and emits keystrokes as `[t_ms, expected, typed]` with `"\b"` for backspace — byte-for-byte the format `backend/app/services/typing_metrics.py` scores. Timestamps are relative to the first keystroke.
+  - **You cannot type past a mistake.** A wrong character is accepted (so it is logged as an error) but nothing after it until it is backspaced. This keeps the final text equal to the target, which the validator requires, and matches TypeRacer's behaviour.
+  - **Input comes from a real `<input>`** laid transparently over the display, so mobile keyboards, IME composition (`compositionstart/end`) and accessibility work. Paste is blocked client-side; the validator would reject it anyway.
+  - **The browser never sends numbers.** `POST /sessions` gets `{text_id, started_at, keystrokes}` and nothing else; a test asserts the request body has exactly those keys. Live WPM/accuracy in the UI use the same formulas as the server but are display-only.
+  - **Per-character `<span>`s for the English renderer.** They break Arabic shaping; M3 replaces the renderer (overlay caret via `Range.getBoundingClientRect()`) and leaves the engine untouched — that is why the engine is renderer-agnostic.
+  - Practice starts the clock at the first keystroke, not when the text appears.
+- **Consequences:** Engine and validator are both unit-tested against the same log format (28 frontend tests, 33 backend tests for metrics + validator). Any future client (mobile app, race mode) reuses the engine unchanged. A user who mistypes must fix it, which is stricter than Monkeytype's "keep going" mode; revisit only if user feedback demands it.
