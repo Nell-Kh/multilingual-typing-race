@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router'
+import PracticePage from '../features/practice/PracticePage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import RegisterPage from '../pages/RegisterPage'
@@ -11,7 +12,10 @@ export function createRouter() {
     { path: '/register', Component: RegisterPage },
     {
       Component: RequireAuth,
-      children: [{ path: '/', Component: HomePage }],
+      children: [
+        { path: '/', Component: HomePage },
+        { path: '/practice', Component: PracticePage },
+      ],
     },
   ])
 }
