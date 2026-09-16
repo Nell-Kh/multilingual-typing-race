@@ -73,7 +73,7 @@ frontend/
   src/i18n/                     language table (labels, direction)
   src/lib/api.ts                typed API client
 infra/          docker-compose.yml
-docs/           DECISIONS.md (ADRs), rtl-notes.md
+docs/           DECISIONS.md (ADRs), rtl-notes.md, race-protocol.md
 .github/        CI workflow (backend + frontend jobs)
 ```
 
@@ -81,6 +81,7 @@ docs/           DECISIONS.md (ADRs), rtl-notes.md
 
 - [Decision log](docs/DECISIONS.md) — every architectural choice, with its reasoning
 - [RTL notes](docs/rtl-notes.md) — how Hebrew and Arabic are normalized, rendered and validated
+- [Race protocol](docs/race-protocol.md) — rooms, WebSocket messages, timing, disconnects, scoring
 
 ## License
 
