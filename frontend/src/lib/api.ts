@@ -130,3 +130,63 @@ export const auth = {
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST', auth: false }),
   me: () => request<User>('/api/v1/auth/me'),
 }
+
+// ---- texts & sessions -----------------------------------------------------------
+
+export interface Text {
+  id: string
+  language: Language
+  content: string
+  char_count: number
+  difficulty: 1 | 2 | 3
+  source: string
+  license: string
+  is_active: boolean
+  created_at: string
+}
+
+export const texts = {
+  random: (lang: Language, difficulty?: 1 | 2 | 3) => {
+    const params = new URLSearchParams({ lang })
+    if (difficulty) params.set('difficulty', String(difficulty))
+    return request<Text>(`/api/v1/texts/random?${params}`, { auth: false })
+  },
+}
+
+/** [t_ms, expected, typed] — see features/typing-engine/engine.ts */
+export type KeystrokeLog = [number, string, string][]
+
+export interface KeyStat {
+  key: string
+  correct: number
+  errors: number
+  avg_latency_ms: number | null
+}
+
+export interface SessionResult {
+  id: string
+  text_id: string
+  mode: 'practice' | 'race' | 'daily'
+  language: Language
+  started_at: string
+  finished_at: string
+  duration_ms: number
+  wpm: number
+  cpm: number
+  raw_wpm: number
+  accuracy: number
+  error_count: number
+  keystroke_count: number
+  is_valid: boolean
+  invalid_reason: string | null
+  created_at: string
+  key_stats: KeyStat[]
+}
+
+export const sessions = {
+  submit: (text_id: string, started_at: string, keystrokes: KeystrokeLog) =>
+    request<SessionResult>('/api/v1/sessions', {
+      method: 'POST',
+      body: { text_id, started_at, keystrokes },
+    }),
+}
