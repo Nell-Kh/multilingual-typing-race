@@ -151,3 +151,30 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
 - **Context:** An external review pointed out that `median_gap_too_low` ran on any log length. A median of a handful of gaps is noise: a fast typist on a short Hebrew or Arabic text (fewer characters for the same content) could be rejected, and the failure would surface as a stored invalid row nobody understands.
 - **Decision:** The median rule applies only once there are at least 20 gaps (`MIN_GAPS_FOR_MEDIAN`). The machine-run rule (10 consecutive keys ≤ 5 ms apart) is deliberately **not** gated: it is about consecutive keys, not a statistic, and it is what catches a paste of a short text. The client-side `onPaste` block in `TypingBox` is a convenience, not a defence; the validator is.
 - **Consequences:** Two new tests pin the boundary (20 gaps skip, 21 apply) and prove a pasted 12-character text is still rejected. Corpus texts are all ≥ 30 characters, so in practice the median rule still runs on every seeded text.
+
+## ADR-016: You cannot type past a mistake
+
+- **Date:** 2026-09-16 · **Status:** accepted (restates one rule from ADR-012 so it is findable)
+- **Context:** Two external reviews asked where this rule was recorded; it was one bullet inside ADR-012 and got missed both times. It changes what "accuracy" means compared with other typing sites, so it deserves its own entry.
+- **Decision:** After a wrong character the engine accepts that character (so the error is logged) and then refuses further input until it is backspaced. The final text therefore always equals the target when the run ends; the validator's `text_mismatch` rule relies on this. Accuracy is `correct / (correct + errors)` over *keystrokes*, so a corrected mistake still costs accuracy, and there is no penalty-per-uncorrected-error because uncorrected errors cannot exist.
+- **Consequences:** Stricter than Monkeytype's default and closer to TypeRacer. Learners must fix mistakes, which is the behaviour a trainer wants. WPM is comparable across languages because it never rewards skipping a hard character. A "lenient" mode would be a new engine rule and a new validator rule, not a toggle.
+
+## ADR-017: UI translations deferred to M6
+
+- **Date:** 2026-09-16 · **Status:** accepted
+- **Context:** The brief put interface translations (Hebrew/Arabic labels, `<html dir>` mirroring) in M3 alongside text-language support. M6 is a visual redesign that will rewrite most labels and layouts.
+- **Decision:** M3 ships the *text* language (picker, `dir`/`lang` on the typing box, fonts) and defers the *interface* language to M6, so strings are translated once, after the final UI exists. What is already in place so the switch is mechanical: every component uses Tailwind logical properties (no `ml-`/`text-left`), `lang`/`dir` are set per element rather than assumed, fonts follow `:lang()`, and `i18next` + `react-i18next` are installed. The two settings stay independent: a Hebrew speaker can practise English typing in a Hebrew UI.
+- **Consequences:** Until M6 the interface is English-only, which is visible to anyone reviewing the app before then. The `src/i18n/` folder holds only the language table for now; `en.json`/`he.json`/`ar.json` arrive with M6.
+
+## ADR-018: Race architecture
+
+- **Date:** 2026-09-16 · **Status:** accepted · full protocol in `docs/race-protocol.md`
+- **Context:** M4 is the first milestone where state outlives a request. Rooms need to survive across API replicas, players refresh tabs mid-race, and placement must be as cheat-resistant as practice scoring.
+- **Decision:**
+  - **Redis is the room store and the event bus.** Room state lives in Redis hashes with TTLs (rooms clean themselves up); every server→client event is published on a per-room channel and every replica relays to its own sockets. Mutations that must not race (join, finish/place) are Lua scripts. Postgres only receives finished results.
+  - **One WebSocket endpoint, auth in the first frame.** Browsers cannot send headers on WebSockets and query strings leak into logs, so the client sends `{"type":"auth","token":…}` first; anything else closes the socket.
+  - **The server clock decides everything that affects fairness**: countdown start, race start, places (order of arrival of valid `finish` frames), timeouts. Client timestamps only animate.
+  - **`progress` is advisory, `finish` is the whole keystroke log.** Races reuse `record_session(mode=RACE)` unchanged, plus the existing `server_duration_ms` check. An invalid log keeps its session row and gets no place.
+  - **Disconnect keeps the slot during a race**; reconnect gets a full snapshot. Host handoff goes to the earliest-joined connected player.
+  - Rooms are join-by-code only, max 5 players, no mid-race joining, no spectators (v1).
+- **Consequences:** The WebSocket handler is thin: parse frame → Lua/Redis → publish. Two-replica correctness is designed in from the start even though Railway runs one replica today. Tests use two in-process WebSocket clients against a real Redis, no browser. The protocol document is the contract the frontend is built against; changing a frame means changing the doc in the same PR.
