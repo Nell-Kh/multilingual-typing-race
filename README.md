@@ -4,7 +4,20 @@ A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice al
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M0 complete** — walking skeleton deployed (frontend, API, Postgres, Redis, CI). No typing features yet; M1 adds auth and the text corpus.
+> Status: **M2 complete** — you can register, log in, and practice typing English texts. Every session is scored and validated server-side from the raw keystroke log. Next: M3, Hebrew and Arabic.
+
+## How scoring works
+
+The browser sends only the keystroke log — `[t_ms, expected, typed]` per key, `"\b"` for backspace — never a number. The server replays it and computes:
+
+| metric   | formula                                        |
+|----------|------------------------------------------------|
+| WPM      | (correct characters ÷ 5) ÷ minutes             |
+| raw WPM  | (all typed characters ÷ 5) ÷ minutes           |
+| CPM      | correct characters ÷ minutes                   |
+| accuracy | correct ÷ (correct + errors) × 100             |
+
+The same formulas apply to all three languages. A session is stored as invalid (and excluded from leaderboards) if the replayed text doesn't match the target, if the median gap between keys is under 30 ms, if 10+ keys arrive ≤ 5 ms apart, or if timestamps go backwards. See `backend/app/services/validator.py`.
 
 ## Stack
 
