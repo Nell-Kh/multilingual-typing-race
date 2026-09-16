@@ -124,7 +124,9 @@ async def app_client(database: str, redis_available: str) -> AsyncIterator["Asyn
     app = create_app(settings)
     async with lifespan(app):
         async with app.state.engine.begin() as conn:
-            await conn.execute(text("TRUNCATE TABLE texts, users CASCADE"))
+            await conn.execute(
+                text("TRUNCATE TABLE session_key_stats, typing_sessions, texts, users CASCADE")
+            )
         await app.state.redis.flushdb()
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             yield c

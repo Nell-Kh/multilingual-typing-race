@@ -12,3 +12,9 @@ class Language(StrEnum):
 class UserRole(StrEnum):
     USER = "user"
     ADMIN = "admin"
+
+
+class SessionMode(StrEnum):
+    PRACTICE = "practice"
+    RACE = "race"
+    DAILY = "daily"

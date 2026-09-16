@@ -36,4 +36,5 @@ def test_migrated_schema_matches_the_models(database: str) -> None:
 
 
 def test_expected_tables_exist(database: str) -> None:
-    assert {"users", "texts"} <= set(Base.metadata.tables)
+    expected = {"users", "texts", "typing_sessions", "session_key_stats"}
+    assert expected <= set(Base.metadata.tables)
