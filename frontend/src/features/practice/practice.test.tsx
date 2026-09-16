@@ -106,6 +106,31 @@ describe('practice page', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('faster than a person can sustain')
   })
 
+  it('a failed submit offers a retry that resends the same log', async () => {
+    let attempts = 0
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/texts/random')) return Promise.resolve(json(TEXT))
+      if (u.endsWith('/sessions') && init?.method === 'POST') {
+        attempts++
+        if (attempts === 1) return Promise.reject(new TypeError('Failed to fetch'))
+        return Promise.resolve(json(RESULT, 201))
+      }
+      return Promise.resolve(json({}, 404))
+    })
+    render(<App />)
+    const user = userEvent.setup()
+    await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'cat sat')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the server')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByTestId('result-wpm')).toHaveTextContent('70')
+    expect(attempts).toBe(2)
+  })
+
   it('Next text fetches a new one and clears the result', async () => {
     render(<App />)
     const user = userEvent.setup()

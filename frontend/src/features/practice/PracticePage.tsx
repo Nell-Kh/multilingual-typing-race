@@ -120,9 +120,20 @@ export default function PracticePage() {
 
       {submit.isPending && <p>Scoring…</p>}
       {submit.isError && (
-        <p role="alert" className="text-red-600">
-          {submit.error instanceof ApiError ? submit.error.message : 'Could not save the session'}
-        </p>
+        <div role="alert" className="flex items-center gap-4 text-red-600">
+          <span>
+            {submit.error instanceof ApiError
+              ? submit.error.message
+              : 'Could not reach the server to save the session'}
+          </span>
+          <button
+            type="button"
+            onClick={() => submit.mutate()}
+            className="rounded border border-current px-3 py-1 text-sm"
+          >
+            Retry
+          </button>
+        </div>
       )}
       {submit.data && <ResultsCard result={submit.data} onNext={next} />}
     </main>
