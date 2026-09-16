@@ -16,6 +16,7 @@ SAMPLE = {
     "source": "test",
     "license": "CC0-1.0",
 }
+NORMALIZED = '"Quick" brown foxes - they\'re fast.'
 
 
 async def _token(client: AsyncClient, email: str, *, admin: bool, database: str) -> str:
@@ -110,8 +111,9 @@ async def test_admin_create_normalizes_and_counts(app_client: AsyncClient, datab
 
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["content"] == SAMPLE["content"]  # display text keeps the curly quotes
-    assert body["char_count"] == len('"Quick" brown foxes - they\'re fast.')  # normalized length
+    # What you see is what you type: the stored text is the normalized form.
+    assert body["content"] == NORMALIZED
+    assert body["char_count"] == len(NORMALIZED)
 
     # And it is immediately servable.
     r = await app_client.get(f"{TEXTS}/random", params={"lang": "en", "difficulty": 2})
@@ -126,7 +128,7 @@ async def test_admin_update_and_soft_delete(app_client: AsyncClient, database: s
     r = await app_client.put(url, json={"difficulty": 3}, headers=_bearer(admin))
     assert r.status_code == 200
     assert r.json()["difficulty"] == 3
-    assert r.json()["content"] == SAMPLE["content"]  # untouched fields stay
+    assert r.json()["content"] == NORMALIZED  # untouched fields stay
 
     assert (await app_client.delete(url, headers=_bearer(admin))).status_code == 204
     assert (await app_client.get(f"{TEXTS}/{created['id']}")).status_code == 404
