@@ -133,3 +133,14 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **The display text is the typing target.** Since M3 the `content` column is stored already normalized (identical to `content_normalized`), so what the player sees is exactly what the validator expects. `content_normalized` stays as the dedup key for seeds; no migration, because both columns already exist and the data (all ASCII English) is unchanged.
   - Corpus rule: he/ar seed texts are unpointed and contain no Latin letters or digits (no mixed-direction runs in v1).
 - **Consequences:** Authors may paste vowelled or typographically fancy text; the importer flattens it. An unpointed Hebrew text and its pointed twin dedupe to one row. Folding (accepting ه for ة) would be a one-line change in one function if learners ask for a lenient mode later. 32 normalization tests document every rule with a concrete example.
+
+## ADR-014: Hebrew and Arabic rendering keeps per-character spans
+
+- **Date:** 2026-09-16 · **Status:** accepted (revises the renderer plan in ADR-012)
+- **Context:** ADR-012 assumed that one `<span>` per character breaks Arabic letter joining and planned an overlay renderer for M3 (whole-word text nodes, caret placed with `Range.getBoundingClientRect()`). Before writing it we measured: in Chromium a per-character Arabic sentence is pixel-identical in width to the same sentence as one text node, with letters joined, as long as all spans share the same font properties. Firefox has shaped across inline boundaries for years; WebKit fixed it for complex scripts in late 2025 (bug 6148).
+- **Decision:**
+  - Keep the per-character renderer for all three languages. Per-language differences are only `dir`, `lang`, and the font selected by CSS `:lang()`.
+  - Fonts are self-hosted via `@fontsource/noto-sans`, `noto-sans-hebrew`, `noto-naskh-arabic` (one script subset each, ~13–53 KB per file); no requests to Google Fonts. Nothing in the typing box is monospace.
+  - Invariants documented in `docs/rtl-notes.md`: identical font properties on every span, no `letter-spacing`, no `inline-block` per character.
+  - The practice-text language is a picker on the practice page, remembered in `localStorage`; it is independent of the UI language.
+- **Consequences:** No second renderer to maintain, and the 17 engine tests plus the TypingBox tests cover all languages with one code path. A browser that does not shape across spans would show disconnected Arabic letters — acceptable given current browser support; the overlay design stays documented as the fallback if that ever changes.

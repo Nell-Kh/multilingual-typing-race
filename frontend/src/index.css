@@ -1,7 +1,32 @@
 @import "tailwindcss";
 
-/* Fonts per language arrive in M3 (Noto Sans / Noto Sans Hebrew / Noto Naskh Arabic). */
+/* Self-hosted Noto fonts (npm @fontsource/*), one script subset each, so no
+   request ever leaves our origin and Hebrew/Arabic never fall back to a font
+   with missing or oddly shaped glyphs. */
+@import "@fontsource/noto-sans/latin-400.css";
+@import "@fontsource/noto-sans/latin-700.css";
+@import "@fontsource/noto-sans-hebrew/hebrew-400.css";
+@import "@fontsource/noto-sans-hebrew/hebrew-700.css";
+@import "@fontsource/noto-naskh-arabic/arabic-400.css";
+@import "@fontsource/noto-naskh-arabic/arabic-700.css";
+
 :root {
-  font-family: system-ui, sans-serif;
+  font-family: "Noto Sans", system-ui, sans-serif;
   color-scheme: light dark;
+}
+
+/* The font follows the `lang` attribute, so a Hebrew typing box inside an
+   English UI (or the reverse) always gets the right glyphs. */
+:lang(he) {
+  font-family: "Noto Sans Hebrew", "Noto Sans", system-ui, sans-serif;
+}
+:lang(ar) {
+  font-family: "Noto Naskh Arabic", "Noto Sans", system-ui, sans-serif;
+}
+
+/* Naskh sits low and small on the line; give it more room than Latin/Hebrew.
+   Every character span inherits this, which is what keeps letters joined. */
+.typing-text:lang(ar) {
+  font-size: 1.15em;
+  line-height: 2;
 }
