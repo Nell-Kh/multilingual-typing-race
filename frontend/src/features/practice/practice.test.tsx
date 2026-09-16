@@ -21,6 +21,7 @@ let submitted: { body: unknown } | null
 
 beforeEach(() => {
   cleanup()
+  localStorage.clear()
   submitted = null
   setAccessToken('tok')
   useAuth.setState({ status: 'authenticated', user: USER as never })
@@ -129,6 +130,30 @@ describe('practice page', () => {
 
     expect(await screen.findByTestId('result-wpm')).toHaveTextContent('70')
     expect(attempts).toBe(2)
+  })
+
+  it('picking a language fetches a text in it, renders it RTL, and is remembered', async () => {
+    const HE_TEXT = { ...TEXT, id: 't2', language: 'he', content: 'שלום עולם', char_count: 9 }
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/texts/random')) return Promise.resolve(json(u.includes('lang=he') ? HE_TEXT : TEXT))
+      return Promise.resolve(json({}, 404))
+    })
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByRole('textbox', { name: 'Type the text above' })
+    expect(screen.getByTestId('typing-box')).toHaveAttribute('dir', 'ltr')
+
+    await user.click(screen.getByRole('button', { name: 'עברית' }))
+
+    await waitFor(() => expect(screen.getByTestId('typing-box')).toHaveAttribute('dir', 'rtl'))
+    expect(screen.getByTestId('typing-box')).toHaveAttribute('lang', 'he')
+    expect(screen.getByRole('button', { name: 'עברית' })).toHaveAttribute('aria-pressed', 'true')
+    expect(localStorage.getItem('practice.language')).toBe('he')
+    const calls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]))
+    expect(calls.some((u) => u.includes('/texts/random') && u.includes('lang=he'))).toBe(true)
   })
 
   it('Next text fetches a new one and clears the result', async () => {

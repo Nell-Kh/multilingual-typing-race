@@ -2,6 +2,12 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useEffect, useReducer, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../auth/store'
+import {
+  LANGUAGES,
+  LANGUAGE_CODES,
+  loadPracticeLanguage,
+  savePracticeLanguage,
+} from '../../i18n/languages'
 import { ApiError, sessions, texts, type Language, type SessionResult } from '../../lib/api'
 import { initialState, liveStats, reduce } from '../typing-engine/engine'
 import { TypingBox } from '../typing-engine/TypingBox'
@@ -12,8 +18,8 @@ type Difficulty = 1 | 2 | 3
 export default function PracticePage() {
   const user = useAuth((s) => s.user)
   const [difficulty, setDifficulty] = useState<Difficulty>(1)
+  const [language, setLanguage] = useState<Language>(loadPracticeLanguage)
   const [attempt, setAttempt] = useState(0) // bump to fetch a new text
-  const language: Language = 'en' // he/ar arrive in M3
 
   const text = useQuery({
     queryKey: ['texts', 'random', language, difficulty, attempt],
@@ -54,6 +60,13 @@ export default function PracticePage() {
     setAttempt((n) => n + 1)
   }
 
+  function pickLanguage(next: Language) {
+    savePracticeLanguage(next)
+    setLanguage(next)
+    setAttempt((n) => n + 1)
+    submit.reset()
+  }
+
   return (
     <main className="flex flex-col gap-6 p-8">
       <header className="flex items-center justify-between">
@@ -66,7 +79,23 @@ export default function PracticePage() {
         </nav>
       </header>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" role="group" aria-label="Language">
+        <span className="text-sm">Language</span>
+        {LANGUAGE_CODES.map((code) => (
+          <button
+            key={code}
+            type="button"
+            lang={code}
+            onClick={() => pickLanguage(code)}
+            className={`rounded border px-3 py-1 ${code === language ? 'bg-blue-600 text-white' : ''}`}
+            aria-pressed={code === language}
+          >
+            {LANGUAGES[code].label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3" role="group" aria-label="Difficulty">
         <span className="text-sm">Difficulty</span>
         {([1, 2, 3] as const).map((d) => (
           <button
@@ -93,7 +122,11 @@ export default function PracticePage() {
 
       {text.data && (
         <>
-          <TypingBox state={engine} onInput={(value, at) => dispatch({ type: 'input', value, at })} />
+          <TypingBox
+            state={engine}
+            language={text.data.language}
+            onInput={(value, at) => dispatch({ type: 'input', value, at })}
+          />
           <dl className="flex gap-8 font-mono text-sm" aria-label="live stats">
             <div>
               <dt className="text-gray-500">time</dt>

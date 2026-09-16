@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CompositionEvent } from 'react'
+import { directionOf } from '../../i18n/languages'
+import type { Language } from '../../lib/api'
 import { charStatuses, type EngineState } from './engine'
 
 interface Props {
   state: EngineState
+  language: Language
   onInput: (value: string, at: number) => void
 }
 
@@ -16,13 +19,19 @@ const STATUS_CLASS = {
 /**
  * The text to type, with a transparent <input> laid over it. The input owns the
  * keyboard (so mobile keyboards, IME composition and accessibility all work); the
- * spans underneath show progress. Per-character spans are fine for English; M3
- * replaces this renderer for Hebrew/Arabic, where spans break letter shaping.
+ * spans underneath show progress.
+ *
+ * One <span> per character works for Hebrew and Arabic too: browsers shape
+ * cursive letters across inline boundaries as long as every span has the same
+ * font (see ADR-014 and docs/rtl-notes.md). The only per-language differences
+ * are `dir`, `lang` (which selects the font via CSS `:lang()`), and the fact
+ * that nothing here is monospace.
  */
-export function TypingBox({ state, onInput }: Props) {
+export function TypingBox({ state, language, onInput }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [composing, setComposing] = useState(false)
   const statuses = charStatuses(state)
+  const dir = directionOf(language)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -41,10 +50,13 @@ export function TypingBox({ state, onInput }: Props) {
 
   return (
     <div
-      className="relative mx-auto max-w-3xl cursor-text rounded-lg border p-6 text-2xl leading-relaxed"
+      dir={dir}
+      lang={language}
+      data-testid="typing-box"
+      className="typing-text relative mx-auto max-w-3xl cursor-text rounded-lg border p-6 text-start text-2xl leading-relaxed"
       onClick={() => inputRef.current?.focus()}
     >
-      <p aria-hidden="true" className="whitespace-pre-wrap break-words font-mono select-none">
+      <p aria-hidden="true" className="whitespace-pre-wrap break-words select-none">
         {Array.from(state.target).map((ch, i) => (
           <span key={i} className={STATUS_CLASS[statuses[i]]}>
             {ch}
@@ -53,6 +65,8 @@ export function TypingBox({ state, onInput }: Props) {
       </p>
       <input
         ref={inputRef}
+        dir={dir}
+        lang={language}
         aria-label="Type the text above"
         className="absolute inset-0 h-full w-full cursor-text opacity-0"
         value={state.typed}
