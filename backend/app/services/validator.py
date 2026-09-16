@@ -13,6 +13,10 @@ from app.services.typing_metrics import Keystroke, is_backspace, replay
 
 # Faster than any human sustains between keys (world-class bursts are ~40 ms).
 MIN_MEDIAN_GAP_MS = 30
+# A median needs a sample: below this many gaps the check is skipped rather than
+# risk a false positive on a short text (ADR-015). Machine-run detection below is
+# not gated: it looks at consecutive keys, which is meaningful at any length.
+MIN_GAPS_FOR_MEDIAN = 20
 # This many consecutive keys with (near-)zero gaps is a paste or a script.
 MACHINE_RUN_KEYS = 10
 MACHINE_RUN_GAP_MS = 5
@@ -52,7 +56,7 @@ def validate(
     gaps = [b[0] - a[0] for a, b in zip(keystrokes, keystrokes[1:], strict=False)]
     if any(g < 0 for g in gaps):
         return Verdict(False, "time_not_monotonic")
-    if gaps and median(gaps) < MIN_MEDIAN_GAP_MS:
+    if len(gaps) >= MIN_GAPS_FOR_MEDIAN and median(gaps) < MIN_MEDIAN_GAP_MS:
         return Verdict(False, "median_gap_too_low")
     run = 1
     for gap in gaps:

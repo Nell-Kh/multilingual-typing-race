@@ -4,7 +4,7 @@ import pytest
 from httpx import AsyncClient
 
 from app import cli
-from app.seeds import en
+from app.seeds import ENTRIES
 
 pytestmark = pytest.mark.db
 
@@ -64,8 +64,9 @@ async def test_random_respects_difficulty(seeded: AsyncClient) -> None:
         assert r.json()["difficulty"] == 3
 
 
-async def test_random_404_when_nothing_matches(seeded: AsyncClient) -> None:
-    r = await seeded.get(f"{TEXTS}/random", params={"lang": "he"})
+async def test_random_404_when_nothing_matches(app_client: AsyncClient) -> None:
+    # Fresh database: nothing seeded yet.
+    r = await app_client.get(f"{TEXTS}/random", params={"lang": "he"})
 
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "not_found"
@@ -147,7 +148,7 @@ async def test_admin_list_pages_through_everything_exactly_once(
     pages = 0
 
     while True:
-        params: dict[str, str | int] = {"limit": 12}
+        params: dict[str, str | int] = {"limit": 25}
         if cursor:
             params["cursor"] = cursor
         r = await seeded.get(ADMIN, params=params, headers=_bearer(admin))
@@ -159,8 +160,8 @@ async def test_admin_list_pages_through_everything_exactly_once(
         if cursor is None:
             break
 
-    assert pages == 3  # 30 seeds / 12 per page
-    assert len(seen) == len(set(seen)) == len(en.ENTRIES)
+    assert pages == 4  # 90 seeds / 25 per page
+    assert len(seen) == len(set(seen)) == len(ENTRIES)
 
 
 async def test_admin_list_rejects_garbage_cursor(app_client: AsyncClient, database: str) -> None:
@@ -182,7 +183,7 @@ async def test_seed_is_idempotent(
     await cli.seed_texts(database_url=database)
 
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith(f"seed-texts: {len(en.ENTRIES)} added")
+    assert out[0].startswith(f"seed-texts: {len(ENTRIES)} added")
     assert out[1].startswith("seed-texts: 0 added")
 
 

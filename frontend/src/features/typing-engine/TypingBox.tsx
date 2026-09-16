@@ -73,6 +73,7 @@ export function TypingBox({ state, language, onInput }: Props) {
         onChange={handleChange}
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={handleCompositionEnd}
+        // Convenience only: the server's validator is the real paste defence (ADR-015).
         onPaste={(e) => e.preventDefault()}
         disabled={state.finished}
         autoComplete="off"
