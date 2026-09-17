@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 7
 
+    # Race timing (docs/race-protocol.md §2, §5, §6). Tests shrink these to milliseconds.
+    race_countdown_seconds: float = 3.0
+    race_finish_grace_seconds: float = 60.0  # race ends this long after the first finish
+    race_max_seconds: float = 300.0  # ... or this long after it started, whatever comes first
+    room_idle_ttl_seconds: int = 600  # lobby / finished rooms expire after this much silence
+    lobby_disconnect_grace_seconds: float = 10.0  # a refresh in the lobby is not a leave
+    ws_auth_timeout_seconds: float = 5.0
+
     @field_validator("database_url")
     @classmethod
     def _use_asyncpg_driver(cls, value: str) -> str:

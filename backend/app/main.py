@@ -9,6 +9,7 @@ from app.api import health, v1
 from app.core.errors import install_error_handlers
 from app.core.settings import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
+from app.services.rooms import RoomService
 
 
 @asynccontextmanager
@@ -19,7 +20,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
     app.state.redis = Redis.from_url(settings.redis_url, socket_connect_timeout=2)
+    app.state.rooms = RoomService(app.state.redis, app.state.session_factory, settings)
     yield
+    await app.state.rooms.close()
     await app.state.redis.aclose()
     await engine.dispose()
 

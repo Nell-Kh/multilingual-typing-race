@@ -38,6 +38,11 @@ testpaths = ["tests"]
 markers = [
     "db: needs a reachable PostgreSQL (skipped automatically when there is none)",
 ]
+filterwarnings = [
+    # Starlette's TestClient (used for the WebSocket tests) nags about httpx2; httpx works.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 100
