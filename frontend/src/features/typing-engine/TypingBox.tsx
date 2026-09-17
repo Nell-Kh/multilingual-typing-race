@@ -7,6 +7,8 @@ interface Props {
   state: EngineState
   language: Language
   onInput: (value: string, at: number) => void
+  /** Show the text but refuse input (a race countdown). */
+  locked?: boolean
 }
 
 const STATUS_CLASS = {
@@ -27,15 +29,15 @@ const STATUS_CLASS = {
  * are `dir`, `lang` (which selects the font via CSS `:lang()`), and the fact
  * that nothing here is monospace.
  */
-export function TypingBox({ state, language, onInput }: Props) {
+export function TypingBox({ state, language, onInput, locked = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [composing, setComposing] = useState(false)
   const statuses = charStatuses(state)
   const dir = directionOf(language)
 
   useEffect(() => {
-    inputRef.current?.focus()
-  }, [state.target])
+    if (!locked) inputRef.current?.focus()
+  }, [state.target, locked])
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     // During IME composition the value is provisional; wait for compositionend.
@@ -75,7 +77,7 @@ export function TypingBox({ state, language, onInput }: Props) {
         onCompositionEnd={handleCompositionEnd}
         // Convenience only: the server's validator is the real paste defence (ADR-015).
         onPaste={(e) => e.preventDefault()}
-        disabled={state.finished}
+        disabled={state.finished || locked}
         autoComplete="off"
         autoCapitalize="off"
         autoCorrect="off"

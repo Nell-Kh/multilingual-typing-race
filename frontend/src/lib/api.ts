@@ -190,3 +190,42 @@ export const sessions = {
       body: { text_id, started_at, keystrokes },
     }),
 }
+
+// ---- rooms (races) ----------------------------------------------------------------
+// The live part of a race runs over a WebSocket (features/race/socket.ts); these are
+// the two plain HTTP calls around it. Frames: docs/race-protocol.md.
+
+export interface RoomPlayer {
+  id: string
+  display_name: string
+  connected: boolean
+  typed: number
+  errors: number
+  finished_at: string | null
+  place: number | null
+  wpm: number | null
+  accuracy: number | null
+  valid: boolean | null
+}
+
+export interface RoomPreview {
+  code: string
+  state: 'lobby' | 'countdown' | 'running' | 'finished'
+  host_id: string
+  language: Language
+  difficulty: 1 | 2 | 3
+  players: RoomPlayer[]
+}
+
+export const rooms = {
+  create: (language: Language, difficulty: 1 | 2 | 3) =>
+    request<RoomPreview>('/api/v1/rooms', { method: 'POST', body: { language, difficulty } }),
+  preview: (code: string) =>
+    request<RoomPreview>(`/api/v1/rooms/${encodeURIComponent(code)}`, { auth: false }),
+}
+
+/** ws(s)://… for the room socket, derived from the API URL. */
+export function roomSocketUrl(code: string): string {
+  const base = API_URL.replace(/^http/, 'ws')
+  return `${base}/api/v1/rooms/${encodeURIComponent(code)}/ws`
+}
