@@ -5,9 +5,9 @@ from sqlalchemy.orm import selectinload
 
 from app.core.deps import CurrentUser, SessionDep
 from app.core.errors import ApiError
-from app.models import TypingSession
+from app.models import SessionMode, TypingSession
 from app.schemas.session import KeyStatOut, SessionResult, SessionSubmit
-from app.services import sessions, texts
+from app.services import sessions, stats, texts
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -34,13 +34,19 @@ async def submit_session(
     text = await texts.get_text(session, body.text_id)
     if text is None or not text.is_active:
         raise ApiError(404, "not_found", "Text not found")
+    if body.mode is SessionMode.DAILY:
+        # The daily challenge is one fixed text per day (ADR-019); anything else is practice.
+        daily = await stats.daily_text(session, text.language, stats.today())
+        if daily is None or daily.id != text.id:
+            raise ApiError(422, "not_daily_text", "That text is not today's daily challenge")
     try:
-        row = await sessions.record_practice_session(
+        row = await sessions.record_session(
             session,
             user_id=user.id,
             text=text,
             started_at=body.started_at,
             raw_keystrokes=body.keystrokes,
+            mode=body.mode,
         )
     except sessions.SessionRejectedError as exc:
         raise ApiError(422, "invalid_session", str(exc)) from exc

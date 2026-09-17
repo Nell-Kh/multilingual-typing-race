@@ -10,10 +10,11 @@ MAX_KEYSTROKES = 20_000  # 2000-char text with generous corrections; bounds requ
 
 
 class SessionSubmit(BaseModel):
-    """What the client sends when a practice run ends. Only the log; no numbers."""
+    """What the client sends when a practice or daily run ends. Only the log; no
+    numbers. Races arrive over the WebSocket instead (docs/race-protocol.md)."""
 
     text_id: uuid.UUID
-    mode: Literal[SessionMode.PRACTICE] = SessionMode.PRACTICE
+    mode: Literal[SessionMode.PRACTICE, SessionMode.DAILY] = SessionMode.PRACTICE
     started_at: datetime
     keystrokes: list[list[object]] = Field(min_length=1, max_length=MAX_KEYSTROKES)
 
