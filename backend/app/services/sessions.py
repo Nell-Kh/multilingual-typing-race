@@ -23,15 +23,21 @@ def _client_duration_ms(keystrokes: list[Keystroke]) -> int:
     return keystrokes[-1][0]
 
 
-async def record_practice_session(
+async def record_session(
     session: AsyncSession,
     *,
     user_id: uuid.UUID,
     text: Text,
     started_at: datetime,
     raw_keystrokes: list[list[object]],
+    mode: SessionMode = SessionMode.PRACTICE,
+    race_id: uuid.UUID | None = None,
+    server_duration_ms: int | None = None,
     now: datetime | None = None,
 ) -> TypingSession:
+    """Score and validate one keystroke log and store it. Practice and race runs
+    share everything except `mode`, the race link, and the extra server-clock
+    check races get (docs/race-protocol.md §5)."""
     now = now or datetime.now(UTC)
     if started_at > now + timedelta(seconds=30):
         raise SessionRejectedError("started_at is in the future")
@@ -53,12 +59,14 @@ async def record_practice_session(
         text.content_normalized,
         wpm=metrics.wpm,
         client_duration_ms=duration_ms,
+        server_duration_ms=server_duration_ms,
     )
 
     row = TypingSession(
         user_id=user_id,
         text_id=text.id,
-        mode=SessionMode.PRACTICE,
+        mode=mode,
+        race_id=race_id,
         language=text.language,
         started_at=started_at,
         finished_at=started_at + timedelta(milliseconds=duration_ms),
@@ -87,6 +95,25 @@ async def record_practice_session(
     await session.commit()
     await session.refresh(row, attribute_names=["key_stats"])
     return row
+
+
+async def record_practice_session(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    text: Text,
+    started_at: datetime,
+    raw_keystrokes: list[list[object]],
+    now: datetime | None = None,
+) -> TypingSession:
+    return await record_session(
+        session,
+        user_id=user_id,
+        text=text,
+        started_at=started_at,
+        raw_keystrokes=raw_keystrokes,
+        now=now,
+    )
 
 
 async def get_session(session: AsyncSession, session_id: uuid.UUID) -> TypingSession | None:

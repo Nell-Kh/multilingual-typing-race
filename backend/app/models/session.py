@@ -49,8 +49,7 @@ class TypingSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     text_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("texts.id", ondelete="RESTRICT"))
     mode: Mapped[SessionMode] = mapped_column(_enum(SessionMode, "session_mode"))
-    # Races arrive in M4; the FK is added by that migration.
-    race_id: Mapped[uuid.UUID | None]
+    race_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("races.id", ondelete="SET NULL"))
     language: Mapped[Language] = mapped_column(_enum(Language, "language"))
 
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
