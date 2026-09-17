@@ -37,12 +37,12 @@ SessionDep = Annotated[AsyncSession, Depends(get_session)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
 
 # auto_error=False so a missing header becomes *our* 401 shape, not FastAPI's.
-_bearer = HTTPBearer(auto_error=False)
+optional_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
     session: SessionDep,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(optional_bearer)],
 ) -> User:
     if credentials is None:
         raise ApiError(401, "unauthorized", "Missing bearer token")

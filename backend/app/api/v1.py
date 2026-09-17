@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api import admin_texts, auth, rooms, sessions, texts
+from app.api import admin_texts, auth, leaderboards, rooms, sessions, stats, texts
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth.router)
@@ -10,3 +10,5 @@ router.include_router(texts.router)
 router.include_router(admin_texts.router)
 router.include_router(sessions.router)
 router.include_router(rooms.router)
+router.include_router(stats.router)
+router.include_router(leaderboards.router)

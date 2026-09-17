@@ -178,3 +178,15 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **Disconnect keeps the slot during a race**; reconnect gets a full snapshot. Host handoff goes to the earliest-joined connected player.
   - Rooms are join-by-code only, max 5 players, no mid-race joining, no spectators (v1).
 - **Consequences:** The WebSocket handler is thin: parse frame → Lua/Redis → publish. Two-replica correctness is designed in from the start even though Railway runs one replica today. Tests use two in-process WebSocket clients against a real Redis, no browser. The protocol document is the contract the frontend is built against; changing a frame means changing the doc in the same PR.
+
+## ADR-019: Stats, leaderboards and a daily challenge without a scheduler
+
+- **Date:** 2026-09-17 · **Status:** accepted
+- **Context:** M5 needs personal stats, per-language leaderboards, and the brief's daily challenge, which it imagined as a cron job (arq) picking a text each midnight. A scheduler is another process to deploy, monitor and keep in sync across replicas, for a feature whose whole requirement is "everyone gets the same text today".
+- **Decision:**
+  - **Only valid sessions score.** Every read in `app/services/stats.py` filters `is_valid`; rejected logs stay in the table for inspection and never reach a number a user sees.
+  - **Leaderboards rank each user's single best valid run** (`DISTINCT ON (user_id)`), per language, over a period of `day`, `week` (ISO, Monday) or `all`, in UTC. Practice and race runs both count; the top 50 are returned, and a logged-in viewer also gets their own row even when outside the top 50.
+  - **The daily text is a pure function of the date:** `sha256("YYYY-MM-DD:lang") mod number_of_active_texts`, indexed over texts ordered by id. Every replica, every request, every player computes the same text with no shared state, no cron, no table. A daily run is a normal `POST /sessions` with `mode=daily`; the server refuses any text that is not today's. The daily leaderboard is the period-`day` board restricted to `mode=daily` and that text.
+  - **Stats** per language: valid runs, best WPM, average WPM and accuracy over the most recent 20 runs (so old slow runs stop dragging the average), total time; plus the last 30 runs as a trend. **Per-key aggregates** (correct, errors, error rate, latency weighted by hits) for the heatmap.
+  - History (`/me/sessions`) uses the same keyset cursor as every other list (ADR-011).
+- **Consequences:** Adding or deactivating a text changes which text future days pick (the modulus changes); do it, but expect the daily text to change if it happens mid-day. The day boundary is UTC everywhere, so players in Israel get the new challenge at 02:00–03:00 local; a per-user timezone is a later refinement. No arq dependency. 9 tests cover the rules through the HTTP API, including invalid runs never scoring and the daily board ignoring practice runs on the same text.
