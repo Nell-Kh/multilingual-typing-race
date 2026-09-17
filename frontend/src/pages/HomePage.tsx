@@ -11,9 +11,14 @@ export default function HomePage() {
       <p>
         Signed in as <strong data-testid="display-name">{user?.display_name}</strong>
       </p>
-      <Link to="/practice" className="rounded bg-blue-600 px-6 py-3 text-lg text-white">
-        Practice
-      </Link>
+      <div className="flex gap-4">
+        <Link to="/practice" className="rounded bg-blue-600 px-6 py-3 text-lg text-white">
+          Practice
+        </Link>
+        <Link to="/race" className="rounded border px-6 py-3 text-lg">
+          Race
+        </Link>
+      </div>
       <button className="rounded border px-4 py-2" onClick={() => void logout()}>
         Log out
       </button>

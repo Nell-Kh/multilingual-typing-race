@@ -97,6 +97,9 @@ never from client timestamps.
   rejected (`duration_disagrees_with_server`, already implemented).
 - An invalid log keeps its `typing_sessions` row (`is_valid=false`), gets no place,
   and shows as "not counted" in the results. Places are only given to valid runs.
+- Keystroke timestamps in `finish` are measured from the server's `started`, not
+  from the player's first key: reaction time is part of a race, and it keeps the
+  client-reported duration comparable with what the server observed.
 - `progress` frames are **advisory**: they drive the other players' progress bars
   and nothing else. Nobody can win by sending `progress` — only a validated
   `finish` counts.

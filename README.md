@@ -4,7 +4,7 @@ A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice al
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M3 complete** — register, log in, and practice typing in Hebrew, Arabic or English (30 original sentences per language, three difficulty levels). Every session is scored and validated server-side from the raw keystroke log. Next: M4, real-time races.
+> Status: **M4 complete** — practice in Hebrew, Arabic or English, or open a room and race up to five friends in real time over WebSockets (join by code, live progress bars, server-decided places). Every run is scored and validated server-side from the raw keystroke log. Next: M5, stats and leaderboards.
 
 ## How scoring works
 
@@ -59,16 +59,17 @@ npm run lint && npm run typecheck && npm test && npm run build
 
 ```
 backend/
-  app/api/        HTTP routes (auth, texts, admin, sessions)
+  app/api/        HTTP routes (auth, texts, admin, sessions) and the room WebSocket
   app/core/       settings, security, errors, dependencies, pagination
   app/i18n/       normalize.py — the he/ar/en normalization rules
   app/models/     SQLAlchemy models; alembic/ holds the migrations
   app/seeds/      the CC0 corpus: en.py, he.py, ar.py
-  app/services/   users, texts, typing_metrics, validator, sessions
+  app/services/   users, texts, typing_metrics, validator, sessions, rooms (Redis + pub/sub)
   tests/          pytest, one file per module; runs against a real Postgres
 frontend/
   src/features/typing-engine/   pure reducer + TypingBox renderer
   src/features/practice/        practice page, results card
+  src/features/race/            room reducer, socket, lobby/race/results pages
   src/features/auth/            auth store and forms
   src/i18n/                     language table (labels, direction)
   src/lib/api.ts                typed API client
