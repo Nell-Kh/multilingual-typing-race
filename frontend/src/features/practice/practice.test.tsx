@@ -67,9 +67,15 @@ describe('practice page', () => {
 
     // What went to the server: only text id, start time, and the log.
     expect(submitted).not.toBeNull()
-    const body = submitted!.body as { text_id: string; started_at: string; keystrokes: unknown[][] }
-    expect(Object.keys(body).sort()).toEqual(['keystrokes', 'started_at', 'text_id'])
+    const body = submitted!.body as {
+      text_id: string
+      mode: string
+      started_at: string
+      keystrokes: unknown[][]
+    }
+    expect(Object.keys(body).sort()).toEqual(['keystrokes', 'mode', 'started_at', 'text_id'])
     expect(body.text_id).toBe('t1')
+    expect(body.mode).toBe('practice')
     expect(body.keystrokes).toHaveLength(7)
     expect(body.keystrokes[0]).toEqual([0, 'c', 'c'])
     expect(body.keystrokes[6]?.[1]).toBe('t')
@@ -154,6 +160,36 @@ describe('practice page', () => {
     expect(localStorage.getItem('practice.language')).toBe('he')
     const calls = vi.mocked(fetch).mock.calls.map((c) => String(c[0]))
     expect(calls.some((u) => u.includes('/texts/random') && u.includes('lang=he'))).toBe(true)
+  })
+
+  it('daily mode types the text of the day and submits with mode=daily', async () => {
+    const DAILY = { day: '2026-09-18', language: 'he', text: { ...TEXT, id: 'd1', language: 'he', content: 'שלום עולם', char_count: 9 } }
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/daily?lang=he')) return Promise.resolve(json(DAILY))
+      if (u.endsWith('/sessions') && init?.method === 'POST') {
+        submitted = { body: JSON.parse(String(init.body)) }
+        return Promise.resolve(json({ ...RESULT, mode: 'daily', language: 'he' }, 201))
+      }
+      return Promise.resolve(json({}, 404))
+    })
+    window.history.pushState({}, '', '/practice?daily=1&lang=he')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('heading', { name: 'Daily challenge' })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Difficulty' })).not.toBeInTheDocument()
+    await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'שלום עולם')
+
+    await screen.findByTestId('result-wpm')
+    const body = submitted!.body as { text_id: string; mode: string }
+    expect(body).toMatchObject({ text_id: 'd1', mode: 'daily' })
+    expect(screen.getByRole('link', { name: "See today's leaderboard" })).toHaveAttribute(
+      'href',
+      '/leaderboard?daily=1&lang=he',
+    )
   })
 
   it('Next text fetches a new one and clears the result', async () => {

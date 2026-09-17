@@ -184,10 +184,15 @@ export interface SessionResult {
 }
 
 export const sessions = {
-  submit: (text_id: string, started_at: string, keystrokes: KeystrokeLog) =>
+  submit: (
+    text_id: string,
+    started_at: string,
+    keystrokes: KeystrokeLog,
+    mode: 'practice' | 'daily' = 'practice',
+  ) =>
     request<SessionResult>('/api/v1/sessions', {
       method: 'POST',
-      body: { text_id, started_at, keystrokes },
+      body: { text_id, mode, started_at, keystrokes },
     }),
 }
 
