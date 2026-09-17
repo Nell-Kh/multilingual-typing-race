@@ -229,3 +229,90 @@ export function roomSocketUrl(code: string): string {
   const base = API_URL.replace(/^http/, 'ws')
   return `${base}/api/v1/rooms/${encodeURIComponent(code)}/ws`
 }
+
+// ---- stats, leaderboards, daily (ADR-019) -----------------------------------------------
+
+export interface LanguageStats {
+  language: Language
+  runs: number
+  best_wpm: number
+  avg_wpm: number
+  avg_accuracy: number
+  total_time_ms: number
+}
+
+export interface TrendPoint {
+  started_at: string
+  language: Language
+  mode: 'practice' | 'race' | 'daily'
+  wpm: number
+  accuracy: number
+}
+
+export interface Stats {
+  languages: LanguageStats[]
+  trend: TrendPoint[]
+}
+
+export type SessionSummary = Omit<SessionResult, 'key_stats'>
+
+export interface SessionPage {
+  items: SessionSummary[]
+  next_cursor: string | null
+}
+
+export interface KeyAggregate {
+  key: string
+  correct: number
+  errors: number
+  error_rate: number
+  avg_latency_ms: number | null
+}
+
+export type Period = 'day' | 'week' | 'all'
+
+export interface LeaderboardRow {
+  rank: number
+  user_id: string
+  display_name: string
+  wpm: number
+  accuracy: number
+  started_at: string
+}
+
+export interface Leaderboard {
+  language: Language
+  period: string
+  rows: LeaderboardRow[]
+  me: LeaderboardRow | null
+}
+
+export interface Daily {
+  day: string
+  language: Language
+  text: Text
+}
+
+export const stats = {
+  me: () => request<Stats>('/api/v1/me/stats'),
+  sessions: (lang?: Language, cursor?: string) => {
+    const params = new URLSearchParams()
+    if (lang) params.set('lang', lang)
+    if (cursor) params.set('cursor', cursor)
+    const qs = params.toString()
+    return request<SessionPage>(`/api/v1/me/sessions${qs ? `?${qs}` : ''}`)
+  },
+  keys: (lang: Language) =>
+    request<{ language: Language; keys: KeyAggregate[] }>(`/api/v1/me/keys?lang=${lang}`),
+}
+
+export const leaderboards = {
+  get: (lang: Language, period: Period) =>
+    // auth: the server adds "your row" when a token is present; anonymous works too.
+    request<Leaderboard>(`/api/v1/leaderboards?lang=${lang}&period=${period}`),
+  daily: (lang: Language) => request<Leaderboard>(`/api/v1/daily/leaderboard?lang=${lang}`),
+}
+
+export const daily = {
+  get: (lang: Language) => request<Daily>(`/api/v1/daily?lang=${lang}`, { auth: false }),
+}

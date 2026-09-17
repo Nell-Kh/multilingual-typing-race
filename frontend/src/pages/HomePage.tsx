@@ -19,6 +19,14 @@ export default function HomePage() {
           Race
         </Link>
       </div>
+      <nav className="flex gap-4 text-sm">
+        <Link className="underline" to="/stats">
+          Your stats
+        </Link>
+        <Link className="underline" to="/leaderboard">
+          Leaderboard
+        </Link>
+      </nav>
       <button className="rounded border px-4 py-2" onClick={() => void logout()}>
         Log out
       </button>

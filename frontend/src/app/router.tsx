@@ -2,6 +2,8 @@ import { createBrowserRouter } from 'react-router'
 import PracticePage from '../features/practice/PracticePage'
 import RacePage from '../features/race/RacePage'
 import RoomPage from '../features/race/RoomPage'
+import LeaderboardPage from '../features/stats/LeaderboardPage'
+import StatsPage from '../features/stats/StatsPage'
 import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import RegisterPage from '../pages/RegisterPage'
@@ -19,6 +21,8 @@ export function createRouter() {
         { path: '/practice', Component: PracticePage },
         { path: '/race', Component: RacePage },
         { path: '/race/:code', Component: RoomPage },
+        { path: '/stats', Component: StatsPage },
+        { path: '/leaderboard', Component: LeaderboardPage },
       ],
     },
   ])
