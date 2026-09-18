@@ -15,11 +15,19 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 class ApiError(Exception):
     """Raise anywhere in a request; the handler below turns it into the JSON shape."""
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        code: str,
+        message: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        # Some failures carry a header the client is meant to act on (429 → Retry-After).
+        self.headers = headers
 
 
 def _payload(code: str, message: str, **extra: Any) -> dict[str, Any]:
@@ -32,7 +40,11 @@ _HTTP_CODES = {401: "unauthorized", 403: "forbidden", 404: "not_found", 405: "me
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status_code, content=_payload(exc.code, exc.message))
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=_payload(exc.code, exc.message),
+            headers=exc.headers,
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

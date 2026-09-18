@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 7
 
+    # Rate limiting on the auth endpoints (ADR-022). Counters are per client address,
+    # except the login one that counts failures per email address. The ceilings are
+    # deliberately far above what a person does and far below what a script does, so
+    # they can stay on without anyone noticing them.
+    rate_limit_enabled: bool = True
+    rate_limit_window_seconds: int = 900
+    rate_limit_register_per_ip: int = 20
+    rate_limit_login_per_ip: int = 40
+    rate_limit_login_failures_per_email: int = 10
+    rate_limit_refresh_per_ip: int = 120
+
     # Race timing (docs/race-protocol.md §2, §5, §6). Tests shrink these to milliseconds.
     race_countdown_seconds: float = 3.0
     race_finish_grace_seconds: float = 60.0  # race ends this long after the first finish

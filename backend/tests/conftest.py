@@ -7,9 +7,10 @@ machine with nothing running; CI always has a database, so nothing is skipped th
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from alembic.config import Config
@@ -112,21 +113,41 @@ def redis_available(test_redis_url: str) -> str:
     return test_redis_url
 
 
+AppClientFactory = Callable[..., AbstractAsyncContextManager["AsyncClient"]]
+
+
 @pytest.fixture
-async def app_client(database: str, redis_available: str) -> AsyncIterator["AsyncClient"]:
+def app_client_factory(database: str, redis_available: str) -> AppClientFactory:
+    """Build an app client with settings of your own — `app_client_factory(
+    rate_limit_window_seconds=1)` — when a test needs the app configured
+    differently. Everything else is identical to `app_client`.
+    """
+
+    @asynccontextmanager
+    async def factory(**overrides: Any) -> AsyncIterator["AsyncClient"]:
+        from httpx import ASGITransport, AsyncClient
+
+        from app.core.settings import Settings
+        from app.main import create_app, lifespan
+
+        settings = Settings(
+            app_env="test", database_url=database, redis_url=redis_available, **overrides
+        )
+        app = create_app(settings)
+        async with lifespan(app):
+            async with app.state.engine.begin() as conn:
+                await conn.execute(
+                    text("TRUNCATE TABLE session_key_stats, typing_sessions, texts, users CASCADE")
+                )
+            await app.state.redis.flushdb()
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+                yield c
+
+    return factory
+
+
+@pytest.fixture
+async def app_client(app_client_factory: AppClientFactory) -> AsyncIterator["AsyncClient"]:
     """The real app wired to the test database and test Redis, both wiped first."""
-    from httpx import ASGITransport, AsyncClient
-
-    from app.core.settings import Settings
-    from app.main import create_app, lifespan
-
-    settings = Settings(app_env="test", database_url=database, redis_url=redis_available)
-    app = create_app(settings)
-    async with lifespan(app):
-        async with app.state.engine.begin() as conn:
-            await conn.execute(
-                text("TRUNCATE TABLE session_key_stats, typing_sessions, texts, users CASCADE")
-            )
-        await app.state.redis.flushdb()
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            yield c
+    async with app_client_factory() as client:
+        yield client

@@ -13,6 +13,7 @@ from app.core.security import InvalidTokenError, TokenType, decode_token
 from app.core.settings import Settings
 from app.models import User, UserRole
 from app.services import users
+from app.services.rate_limit import RateLimiter
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -32,9 +33,32 @@ def get_redis(request: Request) -> Redis:
     return redis
 
 
+def get_rate_limiter(request: Request) -> RateLimiter:
+    return RateLimiter(request.app.state.redis)
+
+
+def get_client_ip(request: Request) -> str:
+    """The address a rate limit counts against.
+
+    Every proxy in the chain *appends* the address it received the connection
+    from, so with one trusted proxy in front (Railway's edge in prod, nginx in
+    the compose stack) the last entry is the only one the client could not
+    write. Taking the first entry instead would let anyone spend someone else's
+    allowance, or dodge their own, by sending an X-Forwarded-For header.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+        if hops:
+            return hops[-1]
+    return request.client.host if request.client else "unknown"
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 RedisDep = Annotated[Redis, Depends(get_redis)]
+RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
+ClientIp = Annotated[str, Depends(get_client_ip)]
 
 # auto_error=False so a missing header becomes *our* 401 shape, not FastAPI's.
 optional_bearer = HTTPBearer(auto_error=False)

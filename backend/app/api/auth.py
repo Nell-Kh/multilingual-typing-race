@@ -2,7 +2,14 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Request, Response, status
 
-from app.core.deps import CurrentUser, RedisDep, SessionDep, SettingsDep
+from app.core.deps import (
+    ClientIp,
+    CurrentUser,
+    RateLimiterDep,
+    RedisDep,
+    SessionDep,
+    SettingsDep,
+)
 from app.core.errors import ApiError
 from app.core.security import (
     InvalidTokenError,
@@ -16,12 +23,43 @@ from app.models import User
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
 from app.schemas.user import UserOut
 from app.services import refresh_tokens, users
+from app.services.rate_limit import Allowance, Limit, RateLimiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
 # The cookie is only ever needed by these routes, so the browser sends it nowhere else.
 REFRESH_COOKIE_PATH = "/api/v1/auth"
+
+# Rate-limit buckets (ADR-022). Names are part of the Redis key, so don't rename
+# them casually: counters written under the old name would be orphaned.
+BUCKET_REGISTER_IP = "auth:register:ip"
+BUCKET_LOGIN_IP = "auth:login:ip"
+BUCKET_LOGIN_EMAIL = "auth:login:email"
+BUCKET_REFRESH_IP = "auth:refresh:ip"
+
+
+def _refuse(allowance: Allowance) -> None:
+    """Turn a spent allowance into the API's error shape, with Retry-After."""
+    raise ApiError(
+        429,
+        "rate_limited",
+        "Too many attempts. Try again in a few minutes.",
+        headers={"Retry-After": str(allowance.retry_after)},
+    )
+
+
+async def _spend(
+    limiter: RateLimiter, settings: Settings, bucket: str, identity: str, times: int
+) -> None:
+    """Count one attempt and refuse if that put the caller over the ceiling."""
+    if not settings.rate_limit_enabled:
+        return
+    allowance = await limiter.hit(
+        bucket, identity, Limit(times, settings.rate_limit_window_seconds)
+    )
+    if not allowance.allowed:
+        _refuse(allowance)
 
 
 async def _issue_tokens(
@@ -55,7 +93,10 @@ async def register(
     session: SessionDep,
     redis: RedisDep,
     settings: SettingsDep,
+    limiter: RateLimiterDep,
+    ip: ClientIp,
 ) -> TokenResponse:
+    await _spend(limiter, settings, BUCKET_REGISTER_IP, ip, settings.rate_limit_register_per_ip)
     try:
         user = await users.create_user(
             session, email=body.email, password=body.password, display_name=body.display_name
@@ -72,10 +113,32 @@ async def login(
     session: SessionDep,
     redis: RedisDep,
     settings: SettingsDep,
+    limiter: RateLimiterDep,
+    ip: ClientIp,
 ) -> TokenResponse:
+    email = body.email.lower()
+    await _spend(limiter, settings, BUCKET_LOGIN_IP, ip, settings.rate_limit_login_per_ip)
+
+    # The per-email counter is *read* before the password is checked, so a guessing
+    # run stops costing an argon2 verification once it is over the ceiling, and is
+    # only *spent* by a failure: getting your own password right, however many
+    # attempts in, is never what locks you out.
+    email_limit = Limit(
+        settings.rate_limit_login_failures_per_email, settings.rate_limit_window_seconds
+    )
+    if settings.rate_limit_enabled:
+        allowance = await limiter.peek(BUCKET_LOGIN_EMAIL, email, email_limit)
+        if not allowance.allowed:
+            _refuse(allowance)
+
     user = await users.authenticate(session, email=body.email, password=body.password)
     if user is None:
+        if settings.rate_limit_enabled:
+            await limiter.hit(BUCKET_LOGIN_EMAIL, email, email_limit)
         raise ApiError(401, "invalid_credentials", "Email or password is incorrect")
+
+    if settings.rate_limit_enabled:
+        await limiter.reset(BUCKET_LOGIN_EMAIL, email)
     return await _issue_tokens(response, redis, settings, user)
 
 
@@ -86,7 +149,10 @@ async def refresh(
     session: SessionDep,
     redis: RedisDep,
     settings: SettingsDep,
+    limiter: RateLimiterDep,
+    ip: ClientIp,
 ) -> TokenResponse:
+    await _spend(limiter, settings, BUCKET_REFRESH_IP, ip, settings.rate_limit_refresh_per_ip)
     raw = request.cookies.get(REFRESH_COOKIE)
     if raw is None:
         raise ApiError(401, "unauthorized", "Missing refresh token")
