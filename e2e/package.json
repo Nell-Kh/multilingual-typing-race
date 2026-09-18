@@ -1,0 +1,13 @@
+{
+  "name": "typing-race-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "End-to-end smoke test: a real browser against a real stack.",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0"
+  }
+}

@@ -20,6 +20,8 @@ coverage.xml
 node_modules/
 frontend/dist/
 frontend/coverage/
+e2e/test-results/
+e2e/playwright-report/
 *.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
