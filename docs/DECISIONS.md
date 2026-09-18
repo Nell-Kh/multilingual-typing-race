@@ -202,3 +202,14 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **Colour is never the only channel**: every cell carries its character and a `title`/`aria-label` with the raw counts. "Not typed yet" is unfilled *and* dashed *and* muted, so it cannot be read as "clean".
   - The board defaults to the language with the most runs, not the last practised one — a heatmap of a language you have never typed is an empty board.
 - **Consequences:** Adding a layout is a data change in `layouts.ts`, not a component change. The three boards were checked against realistic data in both colour schemes before shipping; the Arabic board correctly lights up ء ئ ؤ ة ى أ, which is where the strict letter matching of ADR-013 actually costs a typist.
+
+## ADR-021: One definition per shared query
+
+- **Date:** 2026-09-18 · **Status:** accepted
+- **Context:** The daily challenge crashed the app. The home card and the practice page both cached `GET /daily` under the key `['daily', lang]`, but they disagreed about what was stored there: the card kept the whole `{ day, language, text }` envelope, the practice page kept only the inner text. A TanStack Query key is a cache address, so whichever page loaded first won — arriving at the practice page from the home card handed it the envelope, `text.data.content` was `undefined`, and rendering a text with no content threw. Opening `/practice?daily=1` directly was fine, which is why the unit test for daily mode stayed green while the deployed site broke.
+- **Decision:**
+  - **A query used by more than one component is defined once**, in `frontend/src/lib/queries.ts`, as a `queryOptions` object that owns both the key and the shape stored under it. Components import the definition instead of retyping the key. A component that wants part of the cached value uses `select`, which changes what that component sees and not what is cached.
+  - **The cached value is the server's response, unmodified.** Reshaping inside `queryFn` is what let two pages store two different things at one address.
+  - The daily definition is `staleTime: Infinity`: the text is fixed for the whole UTC day, and without it a window-focus refetch could swap the text out mid-run.
+  - **A crash-level bug gets a test that fails on the old code.** The regression test walks the route the user walks — home page, click "Type today's text", type — because the bug only exists in the transition between two pages.
+- **Consequences:** Cache keys stop being written by hand in components, so the next shared query cannot drift the same way. A second bug surfaced next to this one and is fixed here too: in daily mode "Next text" bumped the counter that belongs to the random-text key, so nothing refetched and the box was never cleared; with one fixed text for the day, the page now resets the engine itself.

@@ -2,16 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useAuth } from "../features/auth/store";
 import { LANGUAGES, loadPracticeLanguage } from "../i18n/languages";
-import { daily } from "../lib/api";
+import { dailyQuery } from "../lib/queries";
 
 export default function HomePage() {
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const language = loadPracticeLanguage();
-  const today = useQuery({
-    queryKey: ["daily", language],
-    queryFn: () => daily.get(language),
-  });
+  // Same definition the practice page uses, so both read the same cached shape (ADR-021).
+  const today = useQuery(dailyQuery(language));
 
   return (
     <main className="flex flex-col items-center gap-6 p-8">
