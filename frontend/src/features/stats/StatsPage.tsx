@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { LANGUAGES } from '../../i18n/languages'
-import { ApiError, stats, type SessionSummary } from '../../lib/api'
+import { LANGUAGES, LANGUAGE_CODES, loadPracticeLanguage } from '../../i18n/languages'
+import { ApiError, stats, type Language, type SessionSummary } from '../../lib/api'
+import { Heatmap } from './Heatmap'
 import { Trend } from './Trend'
 
 function minutes(ms: number): string {
@@ -15,6 +17,18 @@ function when(iso: string): string {
 
 export default function StatsPage() {
   const me = useQuery({ queryKey: ['me', 'stats'], queryFn: stats.me })
+  // Default to the language with the most runs (a heatmap of a language you have
+  // never typed is an empty board); an explicit pick always wins.
+  const [picked, setPicked] = useState<Language | null>(null)
+  const busiest = me.data?.languages.reduce(
+    (best, s) => (best && best.runs >= s.runs ? best : s),
+    undefined as { language: Language; runs: number } | undefined,
+  )
+  const keyLang = picked ?? busiest?.language ?? loadPracticeLanguage()
+  const keys = useQuery({
+    queryKey: ['me', 'keys', keyLang],
+    queryFn: () => stats.keys(keyLang),
+  })
   const history = useInfiniteQuery({
     queryKey: ['me', 'sessions'],
     queryFn: ({ pageParam }) => stats.sessions(undefined, pageParam),
@@ -81,6 +95,28 @@ export default function StatsPage() {
           <section aria-label="trend">
             <h2 className="mb-2 font-semibold">Recent runs</h2>
             <Trend points={me.data.trend} />
+          </section>
+
+          <section aria-label="keyboard">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <h2 className="font-semibold">Weak keys</h2>
+              <div className="flex gap-2" role="group" aria-label="Keyboard language">
+                {LANGUAGE_CODES.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    lang={c}
+                    onClick={() => setPicked(c)}
+                    className={`rounded border px-2 py-0.5 text-sm ${c === keyLang ? 'bg-blue-600 text-white' : ''}`}
+                    aria-pressed={c === keyLang}
+                  >
+                    {LANGUAGES[c].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {keys.isPending && <p className="text-sm text-gray-500">Loading…</p>}
+            {keys.data && <Heatmap language={keyLang} keys={keys.data.keys} />}
           </section>
         </>
       )}
