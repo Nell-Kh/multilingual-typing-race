@@ -190,3 +190,15 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **Stats** per language: valid runs, best WPM, average WPM and accuracy over the most recent 20 runs (so old slow runs stop dragging the average), total time; plus the last 30 runs as a trend. **Per-key aggregates** (correct, errors, error rate, latency weighted by hits) for the heatmap.
   - History (`/me/sessions`) uses the same keyset cursor as every other list (ADR-011).
 - **Consequences:** Adding or deactivating a text changes which text future days pick (the modulus changes); do it, but expect the daily text to change if it happens mid-day. The day boundary is UTC everywhere, so players in Israel get the new challenge at 02:00–03:00 local; a per-user timezone is a later refinement. No arq dependency. 9 tests cover the rules through the HTTP API, including invalid runs never scoring and the daily board ignoring practice runs on the same text.
+
+## ADR-020: The keyboard heatmap
+
+- **Date:** 2026-09-18 · **Status:** accepted
+- **Context:** The brief promised a per-key heatmap on the three reference layouts (US QWERTY, Hebrew SI-1452, Arabic 101). `GET /me/keys` already returns per-character totals (ADR-019); the open questions were how to map characters to physical keys, and how to colour the result without lying.
+- **Decision:**
+  - **A key owns every character it produces**, so `a`/`A` are one cell and so are `ا`/`أ` (unshifted/shifted on the Arabic home row). The stats are keyed by character; the layout does the folding.
+  - **Mappings we are not sure of are left out, not guessed.** Any character that has data and no key claims it is listed under the board ("not on this layout") instead of being silently dropped or attached to the wrong cell. A test asserts every Hebrew and Arabic letter has a home, so that row only ever holds punctuation we chose not to place.
+  - **Colour is a sequential one-hue ramp over the error rate** (never missed → no fill; then four red steps). Dark mode is its own set of steps — the named dark reds are all vivid, so an inverted copy made a 96%-accurate board look on fire; a tint rising off the surface keeps "near zero" quiet in both modes.
+  - **Colour is never the only channel**: every cell carries its character and a `title`/`aria-label` with the raw counts. "Not typed yet" is unfilled *and* dashed *and* muted, so it cannot be read as "clean".
+  - The board defaults to the language with the most runs, not the last practised one — a heatmap of a language you have never typed is an empty board.
+- **Consequences:** Adding a layout is a data change in `layouts.ts`, not a component change. The three boards were checked against realistic data in both colour schemes before shipping; the Arabic board correctly lights up ء ئ ؤ ة ى أ, which is where the strict letter matching of ADR-013 actually costs a typist.

@@ -4,7 +4,7 @@ A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice al
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M4 complete** — practice in Hebrew, Arabic or English, or open a room and race up to five friends in real time over WebSockets (join by code, live progress bars, server-decided places). Every run is scored and validated server-side from the raw keystroke log. Next: M5, stats and leaderboards.
+> Status: **M5 complete** — practice in Hebrew, Arabic or English, race up to five friends in real time over WebSockets, take the daily challenge, and track your speed, accuracy and weak keys per language. Every run is scored and validated server-side from the raw keystroke log. Next: M6, the visual pass.
 
 ## How scoring works
 
@@ -64,12 +64,13 @@ backend/
   app/i18n/       normalize.py — the he/ar/en normalization rules
   app/models/     SQLAlchemy models; alembic/ holds the migrations
   app/seeds/      the CC0 corpus: en.py, he.py, ar.py
-  app/services/   users, texts, typing_metrics, validator, sessions, rooms (Redis + pub/sub)
+  app/services/   users, texts, typing_metrics, validator, sessions, rooms (Redis + pub/sub), stats
   tests/          pytest, one file per module; runs against a real Postgres
 frontend/
   src/features/typing-engine/   pure reducer + TypingBox renderer
   src/features/practice/        practice page, results card
   src/features/race/            room reducer, socket, lobby/race/results pages
+  src/features/stats/           stats, leaderboards, keyboard heatmap + layouts
   src/features/auth/            auth store and forms
   src/i18n/                     language table (labels, direction)
   src/lib/api.ts                typed API client
