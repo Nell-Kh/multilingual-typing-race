@@ -36,8 +36,27 @@ export interface TokenResponse {
   expires_in: number
 }
 
-/** Ask the API for a new access token using the refresh cookie. Null if there is none. */
-export async function refreshAccessToken(): Promise<string | null> {
+let refreshInFlight: Promise<string | null> | null = null
+
+/**
+ * Ask the API for a new access token using the refresh cookie. Null if there is none.
+ *
+ * At most one of these runs at a time. Refreshing *rotates* the token (ADR-009): the
+ * cookie is spent by the first request to arrive, so a second one sent in parallel is
+ * asking with a token that no longer exists and is rejected — and its `setAccessToken(null)`
+ * would then log out a session the first call had just renewed. That happens for real:
+ * three stats queries firing together after the access token expires, two tabs waking
+ * at once, or React's StrictMode running the bootstrap effect twice. Callers share the
+ * one request instead.
+ */
+export function refreshAccessToken(): Promise<string | null> {
+  refreshInFlight ??= requestRefresh().finally(() => {
+    refreshInFlight = null
+  })
+  return refreshInFlight
+}
+
+async function requestRefresh(): Promise<string | null> {
   const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
     method: 'POST',
     credentials: 'include',

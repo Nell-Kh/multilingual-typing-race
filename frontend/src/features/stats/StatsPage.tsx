@@ -6,8 +6,11 @@ import { ApiError, stats, type Language, type SessionSummary } from '../../lib/a
 import { Heatmap } from './Heatmap'
 import { Trend } from './Trend'
 
-function minutes(ms: number): string {
-  const m = Math.round(ms / 60000)
+/** Time spent typing, at a scale that fits it: a first run is seconds, not "0 min". */
+function duration(ms: number): string {
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `${seconds} s`
+  const m = Math.round(seconds / 60)
   return m < 60 ? `${m} min` : `${(m / 60).toFixed(1)} h`
 }
 
@@ -86,7 +89,7 @@ export default function StatsPage() {
                   <dt className="text-gray-500">runs</dt>
                   <dd>{s.runs}</dd>
                   <dt className="text-gray-500">time</dt>
-                  <dd>{minutes(s.total_time_ms)}</dd>
+                  <dd>{duration(s.total_time_ms)}</dd>
                 </dl>
               </div>
             ))}
@@ -116,6 +119,11 @@ export default function StatsPage() {
               </div>
             </div>
             {keys.isPending && <p className="text-sm text-gray-500">Loading…</p>}
+            {keys.isError && (
+              <p role="alert" className="text-sm text-red-600">
+                {keys.error instanceof ApiError ? keys.error.message : 'Could not load your keys'}
+              </p>
+            )}
             {keys.data && <Heatmap language={keyLang} keys={keys.data.keys} />}
           </section>
         </>
@@ -123,7 +131,14 @@ export default function StatsPage() {
 
       <section aria-label="history">
         <h2 className="mb-2 font-semibold">History</h2>
-        {runs.length === 0 && !history.isPending && <p className="text-sm text-gray-500">Nothing yet.</p>}
+        {history.isError && (
+          <p role="alert" className="text-sm text-red-600">
+            {history.error instanceof ApiError ? history.error.message : 'Could not load your history'}
+          </p>
+        )}
+        {runs.length === 0 && !history.isPending && !history.isError && (
+          <p className="text-sm text-gray-500">Nothing yet.</p>
+        )}
         {runs.length > 0 && (
           <table className="w-full text-sm">
             <thead className="text-start text-gray-500">
