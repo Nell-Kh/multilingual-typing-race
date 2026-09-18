@@ -4,7 +4,7 @@ A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice al
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M5 complete** — practice in Hebrew, Arabic or English, race up to five friends in real time over WebSockets, take the daily challenge, and track your speed, accuracy and weak keys per language. Every run is scored and validated server-side from the raw keystroke log. Next: M6, the visual pass.
+> Status: **M5 complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
 
 ## How scoring works
 
@@ -17,7 +17,7 @@ The browser sends only the keystroke log — `[t_ms, expected, typed]` per key, 
 | CPM      | correct characters ÷ minutes                   |
 | accuracy | correct ÷ (correct + errors) × 100             |
 
-The same formulas apply to all three languages. A session is stored as invalid (and excluded from leaderboards) if the replayed text doesn't match the target, if the median gap between keys is under 30 ms (checked once there are at least 20 gaps to take a median of), if 10+ keys arrive ≤ 5 ms apart, or if timestamps go backwards. See `backend/app/services/validator.py`.
+The same formulas apply to all three languages. A session is stored as invalid — kept for inspection, excluded from stats and leaderboards — if the log is empty, if it holds fewer keystrokes than the text has characters, if replaying it doesn't reproduce the target text, if timestamps go backwards, if the median gap between keys is under 30 ms (checked once there are at least 20 gaps to take a median of), if 10 or more keys arrive ≤ 5 ms apart, or, in a race, if the client's duration disagrees with the server's clock by more than 1.5 s. A valid run above 250 WPM is kept and flagged for review rather than rejected. See `backend/app/services/validator.py`.
 
 ## Hebrew and Arabic
 
@@ -59,7 +59,8 @@ npm run lint && npm run typecheck && npm test && npm run build
 
 ```
 backend/
-  app/api/        HTTP routes (auth, texts, admin, sessions) and the room WebSocket
+  app/api/        HTTP routes (health, auth, texts, admin, sessions, stats, leaderboards + daily)
+                  and the room WebSocket
   app/core/       settings, security, errors, dependencies, pagination
   app/i18n/       normalize.py — the he/ar/en normalization rules
   app/models/     SQLAlchemy models; alembic/ holds the migrations
@@ -73,11 +74,18 @@ frontend/
   src/features/stats/           stats, leaderboards, keyboard heatmap + layouts
   src/features/auth/            auth store and forms
   src/i18n/                     language table (labels, direction)
-  src/lib/api.ts                typed API client
+  src/lib/                      api.ts (typed API client), queries.ts (shared query definitions)
 infra/          docker-compose.yml
 docs/           DECISIONS.md (ADRs), rtl-notes.md, race-protocol.md
 .github/        CI workflow (backend + frontend jobs)
 ```
+
+## Planned
+
+Not built yet. Everything above this section describes what is in the repo today.
+
+- **M6 — the visual pass.** The current interface is deliberately plain: correct behaviour, default styling. M6 is the design of every page, dark mode included.
+- **Interface translations.** Hebrew and Arabic labels with a mirrored layout, deferred to M6 so the strings are translated once against the final UI (ADR-017). The text language and the interface language stay independent: a Hebrew speaker can practise English typing in a Hebrew interface.
 
 ## Docs
 
