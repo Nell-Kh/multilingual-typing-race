@@ -10,12 +10,12 @@ import {
 } from "../../i18n/languages";
 import {
   ApiError,
-  daily,
   sessions,
   texts,
   type Language,
   type SessionResult,
 } from "../../lib/api";
+import { dailyQuery, selectDailyText } from "../../lib/queries";
 import { isLanguage } from "../../i18n/languages";
 import { initialState, liveStats, reduce } from "../typing-engine/engine";
 import { TypingBox } from "../typing-engine/TypingBox";
@@ -35,17 +35,22 @@ export default function PracticePage() {
   );
   const [attempt, setAttempt] = useState(0); // bump to fetch a new text
 
-  const text = useQuery({
-    queryKey: isDaily
-      ? ["daily", language]
-      : ["texts", "random", language, difficulty, attempt],
-    queryFn: async () =>
-      isDaily
-        ? (await daily.get(language)).text
-        : texts.random(language, difficulty),
+  // Two queries, one of them switched off: the daily challenge and a random text are
+  // different resources with different cache keys, and the daily one is defined once
+  // in lib/queries.ts because the home page reads the same key (ADR-021).
+  const dailyText = useQuery({
+    ...dailyQuery(language),
+    select: selectDailyText,
+    enabled: isDaily,
+  });
+  const randomText = useQuery({
+    queryKey: ["texts", "random", language, difficulty, attempt],
+    queryFn: () => texts.random(language, difficulty),
+    enabled: !isDaily,
     staleTime: Infinity,
     retry: false,
   });
+  const text = isDaily ? dailyText : randomText;
 
   const [engine, dispatch] = useReducer(reduce, initialState(""));
   useEffect(() => {
@@ -84,7 +89,10 @@ export default function PracticePage() {
 
   function next() {
     submit.reset();
-    setAttempt((n) => n + 1);
+    // Free practice fetches a different text, and the effect above resets the engine.
+    // The daily text is fixed for the day, so there is no new fetch: reset it here.
+    if (isDaily) dispatch({ type: "reset", target: text.data?.content ?? "" });
+    else setAttempt((n) => n + 1);
   }
 
   function pickLanguage(next: Language) {
@@ -227,10 +235,7 @@ export default function PracticePage() {
       )}
       {submit.data && isDaily && (
         <>
-          <ResultsCard
-            result={submit.data}
-            onNext={() => setAttempt((n) => n + 1)}
-          />
+          <ResultsCard result={submit.data} onNext={next} />
           <p className="text-sm">
             <Link
               className="underline"

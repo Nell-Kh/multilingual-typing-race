@@ -204,4 +204,54 @@ describe('practice page', () => {
     const calls = vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes('/texts/random'))
     expect(calls.length).toBe(2)
   })
+
+  // Regression (ADR-021): the home card and the practice page share the ['daily', lang]
+  // cache key, so they have to agree on what is stored under it. They did not: the card
+  // cached the whole { day, language, text } envelope and the practice page read that
+  // key expecting the inner text, so arriving from the home page rendered a text with no
+  // content at all. Going straight to the URL never hit it, which is why the test above
+  // stayed green while the app crashed.
+  it('opening the daily challenge from the home page shows the text of the day', async () => {
+    const DAILY = { day: '2026-09-18', language: 'en', text: { ...TEXT, id: 'd1', content: 'snow on the gate', char_count: 16 } }
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/daily?lang=en')) return Promise.resolve(json(DAILY))
+      return Promise.resolve(json({}, 404))
+    })
+    window.history.pushState({}, '', '/')
+    render(<App />)
+    const user = userEvent.setup()
+
+    expect(await screen.findByTestId('daily-card')).toHaveTextContent('snow on the gate')
+    await user.click(screen.getByRole('link', { name: "Type today's text" }))
+
+    expect(await screen.findByRole('heading', { name: 'Daily challenge' })).toBeInTheDocument()
+    expect(await screen.findByTestId('typing-box')).toHaveTextContent('snow on the gate')
+    expect(await screen.findByRole('textbox', { name: 'Type the text above' })).toBeEnabled()
+  })
+
+  it('a second go at the daily challenge clears the box without fetching a new text', async () => {
+    const DAILY = { day: '2026-09-18', language: 'en', text: { ...TEXT, id: 'd1', content: 'cat sat', char_count: 7 } }
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/daily?lang=en')) return Promise.resolve(json(DAILY))
+      if (u.endsWith('/sessions') && init?.method === 'POST') return Promise.resolve(json({ ...RESULT, mode: 'daily' }, 201))
+      return Promise.resolve(json({}, 404))
+    })
+    window.history.pushState({}, '', '/practice?daily=1&lang=en')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'cat sat')
+    await screen.findByTestId('result-wpm')
+    await user.click(screen.getByRole('button', { name: 'Next text' }))
+
+    await waitFor(() => expect(screen.queryByTestId('result-wpm')).not.toBeInTheDocument())
+    expect(screen.getByRole('textbox', { name: 'Type the text above' })).toHaveValue('')
+    expect(screen.getByTestId('typing-box')).toHaveTextContent('cat sat')
+  })
 })
