@@ -12,6 +12,8 @@ export interface RoomView {
   hostId: string | null
   language: Language
   difficulty: 1 | 2 | 3
+  /** Seats in the room, from the server (ADR-028); null until the first snapshot. */
+  maxPlayers: number | null
   text: RaceText | null
   startsAt: string | null
   startedAt: string | null
@@ -33,6 +35,7 @@ export function initialRoom(): RoomView {
     hostId: null,
     language: 'en',
     difficulty: 1,
+    maxPlayers: null,
     text: null,
     startsAt: null,
     startedAt: null,
@@ -62,6 +65,7 @@ export function reduceRoom(view: RoomView, action: RoomAction): RoomView {
         hostId: f.host_id,
         language: f.language,
         difficulty: f.difficulty,
+        maxPlayers: f.max_players,
         text: f.text,
         startsAt: f.starts_at,
         startedAt: f.started_at,

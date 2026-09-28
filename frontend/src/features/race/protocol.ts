@@ -29,6 +29,7 @@ export type ServerFrame =
       host_id: string
       language: Language
       difficulty: 1 | 2 | 3
+      max_players: number
       text: RaceText | null
       starts_at: string | null
       started_at: string | null

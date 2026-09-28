@@ -238,6 +238,7 @@ export interface RoomPreview {
   host_id: string
   language: Language
   difficulty: 1 | 2 | 3
+  max_players: number
   players: RoomPlayer[]
 }
 

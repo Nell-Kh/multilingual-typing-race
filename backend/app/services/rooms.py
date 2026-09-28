@@ -122,6 +122,8 @@ class Room:
             "host_id": self.host_id,
             "language": self.language,
             "difficulty": self.difficulty,
+            # The client shows "n / max" from this, so the cap lives in one place (ADR-028).
+            "max_players": MAX_PLAYERS,
             "text": text,
             "starts_at": self.starts_at,
             "started_at": self.started_at,
