@@ -10,9 +10,70 @@
 @import "@fontsource/noto-naskh-arabic/arabic-400.css";
 @import "@fontsource/noto-naskh-arabic/arabic-700.css";
 
+/* Design tokens (ADR-032). Every colour is a variable with a light and a dark
+   value; Tailwind utilities (bg-paper, text-muted, border-line, …) read the
+   variables, so a component never needs a `dark:` variant for these. Contrast
+   of every text colour on `surface` is at least 4.5:1 in both themes. */
 :root {
+  --paper: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #15181e;
+  --muted: #5a6170;
+  --line: #e1e5eb;
+  --accent: #1f5fd1;
+  --accent-soft: #e7eefb;
+  --ok: #17804f;
+  --err: #c2334a;
+  --err-soft: #fbe6ea;
+
   font-family: "Noto Sans", system-ui, sans-serif;
   color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #101318;
+    --surface: #171a20;
+    --ink: #e7e9ee;
+    --muted: #9aa1ae;
+    --line: #2a2f37;
+    --accent: #6f9cff;
+    --accent-soft: #1c2740;
+    --ok: #4cc38a;
+    --err: #ff6b81;
+    --err-soft: #3a1d24;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-err: var(--err);
+  --color-err-soft: var(--err-soft);
+
+  --font-sans: "Noto Sans", system-ui, sans-serif;
+
+  /* Typing text: phone sizes first, the larger pair from the sm breakpoint
+     (640px). Arabic is one step up because Naskh reads small at equal size. */
+  --text-typing: 1.5rem;
+  --text-typing-ar: 1.75rem;
+  --text-typing-lg: 1.875rem;
+  --text-typing-ar-lg: 2.25rem;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --container-page: 60rem;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
 }
 
 /* The font follows the `lang` attribute, so a Hebrew typing box inside an

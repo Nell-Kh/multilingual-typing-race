@@ -1,8 +1,10 @@
 import { Link, useNavigate } from 'react-router'
 import { AuthForm } from '../features/auth/AuthForm'
 import { useAuth } from '../features/auth/store'
+import { useTitle } from '../ui/useTitle'
 
 export default function RegisterPage() {
+  useTitle('Create account')
   const register = useAuth((s) => s.register)
   const navigate = useNavigate()
 

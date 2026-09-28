@@ -47,7 +47,7 @@ test('register, practise, get scored, appear on the leaderboard', async ({ page 
   const { name, email } = freshId('practice')
   await register(page, name, email)
 
-  await page.getByRole('link', { name: 'Practice' }).click()
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Practice' }).click()
   await typeTheWholeText(page)
 
   // The result card is the server's answer, not the live counter's.
