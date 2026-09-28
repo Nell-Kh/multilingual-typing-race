@@ -45,6 +45,8 @@ The stats page: best and average per language, the last runs as a trend, and the
 
 Email and password (argon2), a short-lived access token held in memory and a rotating refresh token in an httpOnly cookie: using a refresh token spends it, so a stolen one stops working the moment the real user refreshes. Registration, login and refresh are rate-limited in Redis — per client address, plus a counter of failed logins per email address that any successful login clears. Ceilings are environment settings, not constants. See [ADR-009](docs/DECISIONS.md) and [ADR-022](docs/DECISIONS.md).
 
+**Keystroke logs are kept.** Each run's raw log — the time and character of every key — is stored for as long as the run exists, so any score can be replayed and checked again later. It is never returned by the API; the run's numbers are ([ADR-029](docs/DECISIONS.md)).
+
 ## How it fits together
 
 ```mermaid
@@ -148,7 +150,7 @@ Not built yet. Everything above this section describes what is in the repo today
 
 - **M6 — the visual pass.** The current interface is deliberately plain: correct behaviour, default styling. M6 is the design of every page, dark mode included.
 - **Interface translations.** Hebrew and Arabic labels with a mirrored layout, deferred to M6 so the strings are translated once against the final UI (ADR-017). The text language and the interface language stay independent: a Hebrew speaker can practise English typing in a Hebrew interface.
-- **Everything else that was considered and deliberately left out** — a background worker, OAuth, race replay, lenient Arabic matching, materialized views, keystroke retention — is listed with its reasoning in ADR-027.
+- **Everything else that was considered and deliberately left out** — a background worker, OAuth, race replay, lenient Arabic matching, materialized views — is listed with its reasoning in ADR-027.
 
 ## Docs
 
