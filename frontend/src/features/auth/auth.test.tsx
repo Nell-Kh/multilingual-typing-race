@@ -40,14 +40,29 @@ afterEach(() => {
 const settled = () => waitFor(() => expect(useAuth.getState().status).not.toBe('unknown'))
 
 describe('auth flow', () => {
-  it('sends an anonymous visitor to /login', async () => {
+  it('sends an anonymous visitor to /login from a page that needs an account', async () => {
+    mockApi((url) => {
+      if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
+      throw new Error(`unexpected ${url}`)
+    })
+    window.history.pushState({}, '', '/stats')
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+  })
+
+  it('shows a visitor the landing page at /, with a way in', async () => {
     mockApi((url) => {
       if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
       throw new Error(`unexpected ${url}`)
     })
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Create account' })).toHaveAttribute('href', '/register')
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login')
+    expect(screen.getByTestId('tagline')).toHaveTextContent('Type in English · עברית · العربية')
+    expect(screen.getByText(/replays every keystroke/)).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument()
   })
 
   it('restores the session from the refresh cookie on load', async () => {
@@ -74,6 +89,7 @@ describe('auth flow', () => {
       }
       throw new Error(`unexpected ${url}`)
     })
+    window.history.pushState({}, '', '/login')
     render(<App />)
     const user = userEvent.setup()
 
@@ -93,6 +109,7 @@ describe('auth flow', () => {
       if (url.endsWith('/auth/login')) return new Promise<Response>((resolve) => (answer = resolve))
       throw new Error(`unexpected ${url}`)
     })
+    window.history.pushState({}, '', '/login')
     render(<App />)
     const user = userEvent.setup()
 
@@ -116,6 +133,7 @@ describe('auth flow', () => {
         return json({ error: { code: 'invalid_credentials', message: 'Email or password is incorrect' } }, 401)
       throw new Error(`unexpected ${url}`)
     })
+    window.history.pushState({}, '', '/login')
     render(<App />)
     const user = userEvent.setup()
 
@@ -158,8 +176,77 @@ describe('auth flow', () => {
     await settled()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Log out' }))
+    await user.click(await screen.findByRole('button', { name: 'Account: Nell' }))
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Log in' })).toBeInTheDocument())
+  })
+
+  it('puts a wrong password message under the password field, in words', async () => {
+    mockApi((url) => {
+      if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
+      if (url.endsWith('/auth/login'))
+        return json({ error: { code: 'invalid_credentials', message: 'Email or password is incorrect' } }, 401)
+      throw new Error(`unexpected ${url}`)
+    })
+    window.history.pushState({}, '', '/login')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Email'), 'nell@example.com')
+    await user.type(screen.getByLabelText('Password'), 'wrong password')
+    await user.keyboard('{Enter}') // Enter submits
+
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent('Email or password is incorrect.')
+    const password = screen.getByLabelText('Password')
+    expect(password).toHaveAttribute('aria-invalid', 'true')
+    expect(password).toHaveAttribute('aria-describedby', message.id)
+  })
+
+  it('checks the register form before sending anything', async () => {
+    const calls: string[] = []
+    mockApi((url) => {
+      calls.push(url)
+      if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
+      throw new Error(`unexpected ${url}`)
+    })
+    window.history.pushState({}, '', '/register')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Email'), 'not-an-email')
+    await user.type(screen.getByLabelText('Password'), 'short')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    const alerts = screen.getAllByRole('alert').map((a) => a.textContent)
+    expect(alerts).toEqual([
+      'Enter the name other players will see.',
+      'That doesn’t look like an email address (name@example.com).',
+      'Use at least 8 characters.',
+    ])
+    expect(calls.filter((u) => u.includes('/auth/register'))).toEqual([])
+    expect(screen.getByLabelText('Display name')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('says under the email field when the address already has an account', async () => {
+    mockApi((url) => {
+      if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
+      if (url.endsWith('/auth/register'))
+        return json({ error: { code: 'email_taken', message: 'An account with this email already exists' } }, 409)
+      throw new Error(`unexpected ${url}`)
+    })
+    window.history.pushState({}, '', '/register')
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Display name'), 'Nell')
+    await user.type(screen.getByLabelText('Email'), 'nell@example.com')
+    await user.type(screen.getByLabelText('Password'), 'correct horse battery')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    const message = await screen.findByRole('alert')
+    expect(message).toHaveTextContent('There is already an account with this email.')
+    expect(screen.getByLabelText('Email')).toHaveAttribute('aria-describedby', message.id)
   })
 })

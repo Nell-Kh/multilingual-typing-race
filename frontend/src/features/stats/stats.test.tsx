@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -150,14 +150,14 @@ describe('signing in as somebody else', () => {
     const user = userEvent.setup()
     expect(await screen.findByTestId('lang-en')).toHaveTextContent('72.5 wpm')
 
-    await user.click(screen.getByRole('link', { name: 'Keyrace' }))
-    await user.click(await screen.findByRole('button', { name: 'Log out' }))
+    await user.click(screen.getByRole('button', { name: /^Account:/ }))
+    await user.click(screen.getByRole('button', { name: 'Log out' }))
 
     await user.type(await screen.findByLabelText('Email'), 'sami@example.com')
     await user.type(screen.getByLabelText('Password'), 'correct horse battery')
     await user.click(screen.getByRole('button', { name: 'Log in' }))
 
-    await user.click(await screen.findByRole('link', { name: 'Your stats' }))
+    await user.click(within(await screen.findByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Stats' }))
 
     expect(screen.queryByTestId('lang-en')).not.toBeInTheDocument()
     expect(screen.queryByText(/72\.5 wpm/)).not.toBeInTheDocument()

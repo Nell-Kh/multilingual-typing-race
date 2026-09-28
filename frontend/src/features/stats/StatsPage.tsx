@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { LANGUAGES, LANGUAGE_CODES, loadPracticeLanguage } from '../../i18n/languages'
 import { ApiError, stats, type Language, type SessionSummary } from '../../lib/api'
+import { myStatsQuery } from '../../lib/queries'
 import { Heatmap } from './Heatmap'
 import { Trend } from './Trend'
 import { useTitle } from '../../ui/useTitle'
@@ -21,7 +22,7 @@ function when(iso: string): string {
 
 export default function StatsPage() {
   useTitle('Your stats')
-  const me = useQuery({ queryKey: ['me', 'stats'], queryFn: stats.me })
+  const me = useQuery(myStatsQuery())
   // Default to the language with the most runs (a heatmap of a language you have
   // never typed is an empty board); an explicit pick always wins.
   const [picked, setPicked] = useState<Language | null>(null)

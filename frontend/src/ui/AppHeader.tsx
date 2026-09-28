@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../features/auth/store'
 import { loadPracticeLanguage } from '../i18n/languages'
 import { Button } from './Button'
@@ -56,6 +56,7 @@ export function AppHeader() {
 function UserMenu() {
   const user = useAuth((s) => s.user)
   const logout = useAuth((s) => s.logout)
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
@@ -97,7 +98,11 @@ function UserMenu() {
           <p className="truncate text-sm">
             Signed in as <strong>{user.display_name}</strong>
           </p>
-          <Button variant="secondary" onClick={() => void logout()}>
+          <Button
+            variant="secondary"
+            // To the log-in page, not "/", which is now the landing page for visitors.
+            onClick={() => void logout().then(() => navigate('/login'))}
+          >
             Log out
           </Button>
         </div>

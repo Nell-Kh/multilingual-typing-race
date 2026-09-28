@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router'
+import { AuthCard } from '../features/auth/AuthCard'
 import { AuthForm } from '../features/auth/AuthForm'
 import { useAuth } from '../features/auth/store'
 import { useTitle } from '../ui/useTitle'
@@ -9,8 +10,17 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   return (
-    <main className="flex flex-col items-center gap-6 p-4 sm:p-8">
-      <h1 className="text-2xl font-bold">Log in</h1>
+    <AuthCard
+      title="Log in"
+      footer={
+        <>
+          No account?{' '}
+          <Link className="font-medium text-accent underline" to="/register">
+            Create one
+          </Link>
+        </>
+      }
+    >
       <AuthForm
         mode="login"
         onSubmit={async ({ email, password }) => {
@@ -18,9 +28,6 @@ export default function LoginPage() {
           navigate('/')
         }}
       />
-      <p className="text-sm">
-        No account? <Link className="underline" to="/register">Create one</Link>
-      </p>
-    </main>
+    </AuthCard>
   )
 }

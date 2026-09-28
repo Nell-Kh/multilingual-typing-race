@@ -4,16 +4,17 @@ import RacePage from '../features/race/RacePage'
 import RoomPage from '../features/race/RoomPage'
 import LeaderboardPage from '../features/stats/LeaderboardPage'
 import StatsPage from '../features/stats/StatsPage'
-import HomePage from '../pages/HomePage'
 import LoginPage from '../pages/LoginPage'
 import RegisterPage from '../pages/RegisterPage'
 import { AppShell } from './AppShell'
 import { PublicShell } from './PublicShell'
 import { RequireAuth } from './RequireAuth'
+import { RootRoute } from './RootRoute'
 
 /** Built per App instance (not at module load) so each test gets a fresh history. */
 export function createRouter() {
   return createBrowserRouter([
+    { path: '/', Component: RootRoute },
     {
       Component: PublicShell,
       children: [
@@ -27,7 +28,6 @@ export function createRouter() {
         {
           Component: AppShell,
           children: [
-            { path: '/', Component: HomePage },
             { path: '/practice', Component: PracticePage },
             { path: '/race', Component: RacePage },
             { path: '/race/:code', Component: RoomPage },
