@@ -103,14 +103,14 @@ export default function PracticePage() {
   }
 
   return (
-    <main className="flex flex-col gap-6 p-8">
+    <main className="flex flex-col gap-6 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {isDaily ? "Daily challenge" : "Practice"}
         </h1>
         <nav className="flex items-center gap-4 text-sm">
           <span>{user?.display_name}</span>
-          <Link className="underline" to="/">
+          <Link className="inline-block py-2 underline" to="/">
             Home
           </Link>
         </nav>
@@ -138,7 +138,7 @@ export default function PracticePage() {
               type="button"
               lang={code}
               onClick={() => pickLanguage(code)}
-              className={`rounded border px-3 py-1 ${code === language ? "bg-blue-600 text-white" : ""}`}
+              className={`rounded border min-w-11 px-3 py-2 ${code === language ? "bg-blue-600 text-white" : ""}`}
               aria-pressed={code === language}
             >
               {LANGUAGES[code].label}
@@ -162,7 +162,7 @@ export default function PracticePage() {
                 setDifficulty(d);
                 next();
               }}
-              className={`rounded border px-3 py-1 ${d === difficulty ? "bg-blue-600 text-white" : ""}`}
+              className={`rounded border min-w-11 px-3 py-2 ${d === difficulty ? "bg-blue-600 text-white" : ""}`}
               aria-pressed={d === difficulty}
             >
               {d}
@@ -224,7 +224,7 @@ export default function PracticePage() {
           <button
             type="button"
             onClick={() => submit.mutate()}
-            className="rounded border border-current px-3 py-1 text-sm"
+            className="rounded border border-current px-3 py-2 text-sm"
           >
             Retry
           </button>

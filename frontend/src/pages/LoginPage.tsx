@@ -7,7 +7,7 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   return (
-    <main className="flex flex-col items-center gap-6 p-8">
+    <main className="flex flex-col items-center gap-6 p-4 sm:p-8">
       <h1 className="text-2xl font-bold">Log in</h1>
       <AuthForm
         mode="login"

@@ -25,10 +25,10 @@ export default function RacePage() {
   }
 
   return (
-    <main className="flex flex-col gap-8 p-8">
+    <main className="flex flex-col gap-8 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Race</h1>
-        <Link className="text-sm underline" to="/">
+        <Link className="inline-block py-2 underline text-sm" to="/">
           Home
         </Link>
       </header>
@@ -45,7 +45,7 @@ export default function RacePage() {
               type="button"
               lang={c}
               onClick={() => setLanguage(c)}
-              className={`rounded border px-3 py-1 ${c === language ? 'bg-blue-600 text-white' : ''}`}
+              className={`rounded border min-w-11 px-3 py-2 ${c === language ? 'bg-blue-600 text-white' : ''}`}
               aria-pressed={c === language}
             >
               {LANGUAGES[c].label}
@@ -59,7 +59,7 @@ export default function RacePage() {
               key={d}
               type="button"
               onClick={() => setDifficulty(d)}
-              className={`rounded border px-3 py-1 ${d === difficulty ? 'bg-blue-600 text-white' : ''}`}
+              className={`rounded border min-w-11 px-3 py-2 ${d === difficulty ? 'bg-blue-600 text-white' : ''}`}
               aria-pressed={d === difficulty}
             >
               {d}
