@@ -75,6 +75,23 @@ describe('keyboard heatmap', () => {
     expect(screen.getByTestId('stray-keys')).toHaveTextContent('( ×5') // 2 correct + 3 missed
   })
 
+  it('sizes every key from the widest row, so the board fits a phone', () => {
+    // Arabic 101's top row is 13 keys: at a fixed 2.5rem it is wider than a 390px
+    // screen. The key is the smaller of 2.5rem and a 13th of the board's width.
+    render(<Heatmap language="ar" keys={[key('ش', 5, 0)]} />)
+
+    const board = screen.getByTestId('heatmap')
+    expect(board.className).toContain('@container')
+    expect(board.style.getPropertyValue('--key')).toBe(
+      'min(2.5rem, calc((100cqw - 12 * 0.25rem) / 13))',
+    )
+    const letter = screen.getByTestId('key-ش')
+    expect(letter.style.width).toBe('calc(var(--key) * 1)')
+    expect(letter.style.height).toBe('var(--key)')
+    // The space bar keeps its proportion instead of a fixed rem width.
+    expect(screen.getByTitle('␣: not typed yet').style.width).toBe('calc(var(--key) * 6)')
+  })
+
   it('says so when there is nothing to show', () => {
     render(<Heatmap language="en" keys={[]} />)
 

@@ -42,16 +42,16 @@ export default function LeaderboardPage() {
   const inTop = board.data?.rows.some((r) => r.user_id === me?.id) ?? false;
 
   return (
-    <main className="flex flex-col gap-6 p-8">
+    <main className="flex flex-col gap-6 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           {isDaily ? "Today's challenge" : "Leaderboard"}
         </h1>
         <nav className="flex gap-4 text-sm">
-          <Link className="underline" to="/stats">
+          <Link className="inline-block py-2 underline" to="/stats">
             Your stats
           </Link>
-          <Link className="underline" to="/">
+          <Link className="inline-block py-2 underline" to="/">
             Home
           </Link>
         </nav>
@@ -68,7 +68,7 @@ export default function LeaderboardPage() {
             type="button"
             lang={c}
             onClick={() => setLanguage(c)}
-            className={`rounded border px-3 py-1 ${c === language ? "bg-blue-600 text-white" : ""}`}
+            className={`rounded border min-w-11 px-3 py-2 ${c === language ? "bg-blue-600 text-white" : ""}`}
             aria-pressed={c === language}
           >
             {LANGUAGES[c].label}
@@ -86,7 +86,7 @@ export default function LeaderboardPage() {
               key={p.value}
               type="button"
               onClick={() => setPeriod(p.value)}
-              className={`rounded border px-3 py-1 ${p.value === period ? "bg-blue-600 text-white" : ""}`}
+              className={`rounded border min-w-11 px-3 py-2 ${p.value === period ? "bg-blue-600 text-white" : ""}`}
               aria-pressed={p.value === period}
             >
               {p.label}

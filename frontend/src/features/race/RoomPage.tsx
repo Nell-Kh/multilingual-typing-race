@@ -122,7 +122,7 @@ export default function RoomPage() {
 
   if (rejected) {
     return (
-      <main className="flex flex-col items-center gap-4 p-8">
+      <main className="flex flex-col items-center gap-4 p-4 sm:p-8">
         <p role="alert" className="text-red-600">
           Could not join room {code}: {rejected}
         </p>
@@ -136,17 +136,17 @@ export default function RoomPage() {
   const total = view.text?.char_count ?? 0
 
   return (
-    <main className="flex flex-col gap-6 p-8">
+    <main className="flex flex-col gap-6 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">
           Room <span className="font-mono tracking-widest">{code}</span>
         </h1>
         <div className="flex items-center gap-4 text-sm">
           {!view.connected && <span className="text-amber-600">reconnecting…</span>}
-          <button type="button" className="underline" onClick={copyCode}>
+          <button type="button" className="inline-block py-2 underline" onClick={copyCode}>
             Copy code
           </button>
-          <button type="button" className="underline" onClick={leave}>
+          <button type="button" className="inline-block py-2 underline" onClick={leave}>
             Leave
           </button>
         </div>

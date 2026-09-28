@@ -41,14 +41,14 @@ export default function StatsPage() {
   const runs: SessionSummary[] = history.data?.pages.flatMap((p) => p.items) ?? []
 
   return (
-    <main className="flex flex-col gap-8 p-8">
+    <main className="flex flex-col gap-8 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your stats</h1>
         <nav className="flex gap-4 text-sm">
-          <Link className="underline" to="/leaderboard">
+          <Link className="inline-block py-2 underline" to="/leaderboard">
             Leaderboard
           </Link>
-          <Link className="underline" to="/">
+          <Link className="inline-block py-2 underline" to="/">
             Home
           </Link>
         </nav>
@@ -110,7 +110,7 @@ export default function StatsPage() {
                     type="button"
                     lang={c}
                     onClick={() => setPicked(c)}
-                    className={`rounded border px-2 py-0.5 text-sm ${c === keyLang ? 'bg-blue-600 text-white' : ''}`}
+                    className={`rounded border px-3 py-2 text-sm ${c === keyLang ? 'bg-blue-600 text-white' : ''}`}
                     aria-pressed={c === keyLang}
                   >
                     {LANGUAGES[c].label}
@@ -140,30 +140,33 @@ export default function StatsPage() {
           <p className="text-sm text-gray-500">Nothing yet.</p>
         )}
         {runs.length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="text-start text-gray-500">
-              <tr>
-                <th className="text-start">when</th>
-                <th className="text-start">language</th>
-                <th className="text-start">mode</th>
-                <th className="text-end">wpm</th>
-                <th className="text-end">accuracy</th>
-                <th className="text-end">counted</th>
-              </tr>
-            </thead>
-            <tbody className="font-mono">
-              {runs.map((r) => (
-                <tr key={r.id} data-testid={`run-${r.id}`}>
-                  <td className="font-sans">{when(r.started_at)}</td>
-                  <td>{r.language}</td>
-                  <td>{r.mode}</td>
-                  <td className="text-end">{r.wpm}</td>
-                  <td className="text-end">{r.accuracy}%</td>
-                  <td className="text-end">{r.is_valid ? 'yes' : 'no'}</td>
+          // Six columns do not fit the narrowest phones; the table scrolls, the page does not.
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-start text-gray-500">
+                <tr>
+                  <th className="text-start">when</th>
+                  <th className="text-start">language</th>
+                  <th className="text-start">mode</th>
+                  <th className="text-end">wpm</th>
+                  <th className="text-end">accuracy</th>
+                  <th className="text-end">counted</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="font-mono">
+                {runs.map((r) => (
+                  <tr key={r.id} data-testid={`run-${r.id}`}>
+                    <td className="font-sans">{when(r.started_at)}</td>
+                    <td>{r.language}</td>
+                    <td>{r.mode}</td>
+                    <td className="text-end">{r.wpm}</td>
+                    <td className="text-end">{r.accuracy}%</td>
+                    <td className="text-end">{r.is_valid ? 'yes' : 'no'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
         {history.hasNextPage && (
           <button

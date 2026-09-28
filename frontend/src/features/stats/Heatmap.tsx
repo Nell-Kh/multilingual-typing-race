@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { KeyAggregate, Language } from '../../lib/api'
 import { LAYOUTS, charsOnLayout, type KeyCap } from './layouts'
 
@@ -45,6 +46,20 @@ const MIN_SAMPLE = 10
 
 const UNJUDGED = 'border-dashed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'
 
+/**
+ * The size of one letter key, fitted to the space the board actually has.
+ *
+ * At full size a key is 2.5rem, and the widest row (13 keys on Arabic 101) is
+ * wider than a phone. The board is a size container, so the key is the smaller of
+ * 2.5rem and an equal share of the container's width: the whole keyboard stays on
+ * screen and in shape instead of scrolling sideways or wrapping a row.
+ */
+function keySize(rows: KeyCap[][]): string {
+  const units = Math.max(...rows.map((r) => r.reduce((sum, k) => sum + (k.width ?? 1), 0)))
+  const gaps = Math.max(...rows.map((r) => r.length - 1))
+  return `min(2.5rem, calc((100cqw - ${gaps} * 0.25rem) / ${units}))`
+}
+
 function binOf(errorRate: number): Bin {
   return BINS.find((b) => errorRate < b.max) ?? BINS[BINS.length - 1]
 }
@@ -76,7 +91,11 @@ export function Heatmap({ language, keys }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col items-center gap-1" data-testid="heatmap">
+      <div
+        className="@container flex flex-col items-center gap-1"
+        data-testid="heatmap"
+        style={{ '--key': keySize(layout.rows) } as CSSProperties}
+      >
         {layout.rows.map((row, i) => (
           <div key={i} className="flex gap-1">
             {row.map((key, j) => {
@@ -95,8 +114,12 @@ export function Heatmap({ language, keys }: Props) {
                   aria-label={title}
                   data-testid={`key-${key.chars[0] ?? key.label}`}
                   data-error-rate={judged ? errorRate.toFixed(4) : ''}
-                  style={key.width ? { width: `${key.width * 2.5}rem` } : undefined}
-                  className={`flex h-10 w-10 items-center justify-center rounded border text-sm
+                  style={{
+                    width: `calc(var(--key) * ${key.width ?? 1})`,
+                    height: 'var(--key)',
+                    fontSize: 'min(0.875rem, calc(var(--key) * 0.45))',
+                  }}
+                  className={`flex shrink-0 items-center justify-center rounded border
                     ${judged ? binOf(errorRate).className : UNJUDGED}`}
                 >
                   {key.label}

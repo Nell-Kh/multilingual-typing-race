@@ -12,7 +12,7 @@ export default function HomePage() {
   const today = useQuery(dailyQuery(language));
 
   return (
-    <main className="flex flex-col items-center gap-6 p-8">
+    <main className="flex flex-col items-center gap-6 p-4 sm:p-8">
       <h1 className="text-2xl font-bold">Multilingual Typing Race</h1>
       <p>
         Signed in as{" "}
@@ -55,10 +55,10 @@ export default function HomePage() {
         </section>
       )}
       <nav className="flex gap-4 text-sm">
-        <Link className="underline" to="/stats">
+        <Link className="inline-block py-2 underline" to="/stats">
           Your stats
         </Link>
-        <Link className="underline" to="/leaderboard">
+        <Link className="inline-block py-2 underline" to="/leaderboard">
           Leaderboard
         </Link>
       </nav>
