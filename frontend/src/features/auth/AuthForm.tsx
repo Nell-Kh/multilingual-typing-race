@@ -74,9 +74,16 @@ export function AuthForm({ mode, onSubmit }: Props) {
       <button
         type="submit"
         disabled={busy}
+        aria-busy={busy}
         className="rounded bg-blue-600 px-4 py-2 text-white disabled:opacity-50"
       >
-        {busy ? '…' : mode === 'login' ? 'Log in' : 'Create account'}
+        {busy
+          ? mode === 'login'
+            ? 'Logging in…'
+            : 'Creating account…'
+          : mode === 'login'
+            ? 'Log in'
+            : 'Create account'}
       </button>
     </form>
   )

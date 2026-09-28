@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { useAuth } from "../features/auth/store";
 import { LANGUAGES, loadPracticeLanguage } from "../i18n/languages";
+import { ApiError } from "../lib/api";
 import { dailyQuery } from "../lib/queries";
 
 export default function HomePage() {
@@ -29,6 +30,27 @@ export default function HomePage() {
           Race
         </Link>
       </div>
+      {today.isPending && (
+        <p className="text-sm text-gray-500" aria-busy="true" data-testid="daily-loading">
+          Loading today&apos;s challenge…
+        </p>
+      )}
+      {today.isError && (
+        // Say it failed rather than leaving a gap where the card should be: an empty
+        // home page reads as "there is no daily challenge", not "it did not load".
+        <p role="alert" className="text-sm text-red-600" data-testid="daily-error">
+          {today.error instanceof ApiError && today.error.status === 404
+            ? "No daily challenge in this language yet."
+            : "Could not load today's challenge."}{" "}
+          <button
+            type="button"
+            className="inline-block py-2 underline"
+            onClick={() => void today.refetch()}
+          >
+            Try again
+          </button>
+        </p>
+      )}
       {today.data && (
         <section
           className="w-full max-w-xl rounded-lg border p-4"
