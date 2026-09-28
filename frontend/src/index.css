@@ -85,9 +85,6 @@ body {
   font-family: "Noto Naskh Arabic", "Noto Sans", system-ui, sans-serif;
 }
 
-/* Naskh sits low and small on the line; give it more room than Latin/Hebrew.
-   Every character span inherits this, which is what keeps letters joined. */
-.typing-text:lang(ar) {
-  font-size: 1.15em;
-  line-height: 2;
-}
+/* Typing text sizes come from the --text-typing* tokens, set on the box in
+   TypingBox.tsx; every character span inherits them, which is what keeps
+   Arabic letters joined (ADR-014). */

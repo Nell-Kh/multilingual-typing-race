@@ -9,13 +9,34 @@ interface Props {
   onInput: (value: string, at: number) => void
   /** Show the text but refuse input (a race countdown). */
   locked?: boolean
+  /** Esc while typing: start this text over. */
+  onRestart?: () => void
 }
 
+/*
+ * Status is shown with colour, background and box-shadow only (ADR-014, ADR-032):
+ * every span keeps identical font properties, no letter-spacing and no
+ * inline-block, so Arabic letters stay joined across a status change. A wrong
+ * character has a background as well as a colour, so it does not rely on
+ * telling red from green.
+ */
 const STATUS_CLASS = {
-  correct: 'text-green-700 dark:text-green-400',
-  incorrect: 'bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-sm',
-  current: 'border-b-2 border-blue-500',
-  pending: 'text-gray-400',
+  correct: 'text-ok',
+  incorrect: 'rounded-sm bg-err-soft text-err',
+  current: 'text-muted',
+  pending: 'text-muted',
+} as const
+
+// The caret sits on the start edge of the next character: left in LTR, right in RTL.
+const CARET = {
+  ltr: 'shadow-[inset_2px_0_0_var(--accent)]',
+  rtl: 'shadow-[inset_-2px_0_0_var(--accent)]',
+} as const
+
+// Phone-first sizes from the design tokens; Arabic one step larger (ADR-032).
+const SIZE = {
+  ar: 'text-typing-ar leading-[2] sm:text-typing-ar-lg',
+  other: 'text-typing leading-[1.8] sm:text-typing-lg',
 } as const
 
 /**
@@ -26,18 +47,29 @@ const STATUS_CLASS = {
  * One <span> per character works for Hebrew and Arabic too: browsers shape
  * cursive letters across inline boundaries as long as every span has the same
  * font (see ADR-014 and docs/rtl-notes.md). The only per-language differences
- * are `dir`, `lang` (which selects the font via CSS `:lang()`), and the fact
- * that nothing here is monospace.
+ * are `dir`, `lang` (which selects the font via CSS `:lang()`), and size.
  */
-export function TypingBox({ state, language, onInput, locked = false }: Props) {
+export function TypingBox({ state, language, onInput, locked = false, onRestart }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const textRef = useRef<HTMLParagraphElement>(null)
   const [composing, setComposing] = useState(false)
+  const [focused, setFocused] = useState(false)
   const statuses = charStatuses(state)
   const dir = directionOf(language)
 
   useEffect(() => {
     if (!locked) inputRef.current?.focus()
   }, [state.target, locked])
+
+  // Keep the line being typed on screen: on a phone the keyboard covers the lower
+  // half, and the visual viewport is what is actually visible above it.
+  useEffect(() => {
+    const caret = textRef.current?.querySelector<HTMLElement>('[data-caret]')
+    if (!caret || typeof caret.scrollIntoView !== 'function') return
+    const visible = window.visualViewport?.height ?? window.innerHeight
+    const { top, bottom } = caret.getBoundingClientRect()
+    if (top < 0 || bottom > visible - 16) caret.scrollIntoView({ block: 'center' })
+  }, [state.typed])
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     // During IME composition the value is provisional; wait for compositionend.
@@ -50,21 +82,50 @@ export function TypingBox({ state, language, onInput, locked = false }: Props) {
     onInput(e.currentTarget.value, performance.now())
   }
 
+  const waiting = !focused && !locked && !state.finished
+
   return (
     <div
       dir={dir}
       lang={language}
       data-testid="typing-box"
-      className="typing-text relative mx-auto max-w-3xl cursor-text rounded-lg border p-6 text-start text-2xl leading-relaxed"
+      data-focused={focused}
+      className={`typing-text relative w-full cursor-text rounded-card border bg-surface px-5 py-6 text-start sm:px-8 sm:py-8
+        ${SIZE[language === 'ar' ? 'ar' : 'other']}
+        ${focused ? 'border-accent ring-2 ring-accent-soft' : 'border-line'}`}
       onClick={() => inputRef.current?.focus()}
     >
-      <p aria-hidden="true" className="whitespace-pre-wrap break-words select-none">
-        {Array.from(state.target).map((ch, i) => (
-          <span key={i} className={STATUS_CLASS[statuses[i]]}>
-            {ch}
-          </span>
-        ))}
+      <p
+        ref={textRef}
+        aria-hidden="true"
+        className={`m-0 whitespace-pre-wrap break-words select-none ${waiting ? 'opacity-40' : ''}`}
+      >
+        {Array.from(state.target).map((ch, i) => {
+          const status = statuses[i]
+          const caret = status === 'current' && !locked
+          return (
+            <span
+              key={i}
+              data-caret={caret || undefined}
+              className={`${STATUS_CLASS[status]} ${caret ? CARET[dir] : ''}`}
+            >
+              {ch}
+            </span>
+          )
+        })}
       </p>
+      {waiting && (
+        <div
+          dir="ltr"
+          lang="en"
+          data-testid="click-to-start"
+          className="pointer-events-none absolute inset-0 grid place-items-center font-sans text-sm leading-normal"
+        >
+          <span className="rounded-full border border-line bg-surface px-4 py-2 font-medium text-accent shadow-sm">
+            Click here or press Tab to type
+          </span>
+        </div>
+      )}
       <input
         ref={inputRef}
         dir={dir}
@@ -73,6 +134,14 @@ export function TypingBox({ state, language, onInput, locked = false }: Props) {
         className="absolute inset-0 h-full w-full cursor-text opacity-0"
         value={state.typed}
         onChange={handleChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && onRestart) {
+            e.preventDefault()
+            onRestart()
+          }
+        }}
         onCompositionStart={() => setComposing(true)}
         onCompositionEnd={handleCompositionEnd}
         // Convenience only: the server's validator is the real paste defence (ADR-015).

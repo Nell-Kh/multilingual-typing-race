@@ -110,7 +110,32 @@ describe('practice page', () => {
     await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'cat sat')
 
     expect(await screen.findByRole('heading', { name: 'Not counted' })).toBeInTheDocument()
+    expect(screen.getByTestId('result-status')).toHaveTextContent('Rejected')
     expect(screen.getByRole('alert')).toHaveTextContent('faster than a person can sustain')
+    // The run can be tried again, or swapped for another text.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next text' })).toBeInTheDocument()
+  })
+
+  it('a flagged run says it counted and why it is being looked at', async () => {
+    vi.mocked(fetch).mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+      if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+      if (u.includes('/texts/random')) return Promise.resolve(json(TEXT))
+      if (u.endsWith('/sessions') && init?.method === 'POST')
+        return Promise.resolve(json({ ...RESULT, wpm: 260, is_valid: true, invalid_reason: 'flagged_for_review' }, 201))
+      return Promise.resolve(json({}, 404))
+    })
+    render(<App />)
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'cat sat')
+
+    expect(await screen.findByRole('heading', { name: 'Result' })).toBeInTheDocument()
+    expect(screen.getByTestId('result-status')).toHaveTextContent('Counted · flagged')
+    expect(screen.getByText(/kept for review/)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('a failed submit offers a retry that resends the same log', async () => {
@@ -169,6 +194,8 @@ describe('practice page', () => {
       if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
       if (u.includes('/auth/me')) return Promise.resolve(json(USER))
       if (u.includes('/daily?lang=he')) return Promise.resolve(json(DAILY))
+      if (u.includes('/daily/leaderboard?lang=he'))
+        return Promise.resolve(json({ language: 'he', period: 'day', rows: [], me: { rank: 3, user_id: 'u1', display_name: 'Nell', wpm: 70, accuracy: 87.5, started_at: '' } }))
       if (u.endsWith('/sessions') && init?.method === 'POST') {
         submitted = { body: JSON.parse(String(init.body)) }
         return Promise.resolve(json({ ...RESULT, mode: 'daily', language: 'he' }, 201))
@@ -190,6 +217,7 @@ describe('practice page', () => {
       'href',
       '/leaderboard?daily=1&lang=he',
     )
+    expect(await screen.findByTestId('daily-rank')).toHaveTextContent('Your best today is #3 (70 wpm)')
   })
 
   it('Next text fetches a new one and clears the result', async () => {
@@ -248,7 +276,9 @@ describe('practice page', () => {
 
     await user.type(await screen.findByRole('textbox', { name: 'Type the text above' }), 'cat sat')
     await screen.findByTestId('result-wpm')
-    await user.click(screen.getByRole('button', { name: 'Next text' }))
+    // The daily text is fixed for the day, so the card offers Try again and no Next text.
+    expect(screen.queryByRole('button', { name: 'Next text' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
 
     await waitFor(() => expect(screen.queryByTestId('result-wpm')).not.toBeInTheDocument())
     expect(screen.getByRole('textbox', { name: 'Type the text above' })).toHaveValue('')
