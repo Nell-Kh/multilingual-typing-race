@@ -29,6 +29,10 @@ What you see is what you type: every text is normalized once at import (niqqud a
 
 ## What it looks like
 
+A real race, recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. Nothing here is staged — Nell and Sami are two browser sessions typing at different speeds, and 144.62 / 107.46 are the numbers the server computed.
+
+![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars advancing as the text turns green right to left, and the server's results with places and WPM](docs/img/race-hebrew.gif)
+
 Practising in Arabic, mid-run. Green is behind the caret, the pink cell is a character typed wrong — and the letters stay joined across it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). Speed, accuracy and errors update as you type; the numbers that count are the server's.
 
 ![The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter, and live WPM, accuracy and error counts underneath](docs/img/practice-arabic.png)

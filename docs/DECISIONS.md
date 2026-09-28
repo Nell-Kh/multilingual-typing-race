@@ -282,3 +282,13 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **No interface translations** (ADR-017), **no OAuth**, **no race replay**, **no lenient Arabic matching** (ADR-013 chose strict letter matching on purpose), **no materialized views** — plain queries are well inside their budget at this scale, and a view would be a second thing to keep correct.
   - **Recharts is not used.** ADR-002 lists it; the one chart is thirty points and a line, drawn as inline SVG. Supersedes that line too.
 - **Consequences:** ADR-002's stack list is now wrong in two places on purpose, which is what superseding means here — it is the record of what was decided in M0, not a description of today. A reviewer asking "why is there no worker?" has an answer. The retention question is the one item on this list that is a genuine open decision rather than a closed one, and it is the first thing to settle if this app ever has users who are not friends.
+
+## ADR-028: Five players to a room
+
+- **Date:** 2026-09-28 · **Status:** accepted (gives the reasoning for one line of ADR-018)
+- **Context:** The brief asked for rooms of 2–10 players. ADR-018 shipped a cap of five (`MAX_PLAYERS = 5` in `services/rooms.py`) and stated it without saying why, which a review correctly flagged.
+- **Decision:** five, for two reasons that both get worse with every seat added.
+  - **Fan-out grows with the square of the room.** Each player sends a progress frame at most every 250 ms (the server drops anything closer than 200 ms), and every frame is published to every player in the room. That is roughly 4 × n² deliveries a second per room: 100 at five players, 400 at ten. Redis pub/sub carries that easily for one room; the point is that the cost of a room is not linear in its size, and five keeps a busy evening of rooms cheap.
+  - **The race screen is one row per player above the text.** Every extra row pushes the sentence further down, and a player cannot scroll while typing. Five rows leave the text where the eye already is.
+  - The use case is friends racing by a shared code, which two to five covers.
+- **Consequences:** Raising the cap is two constants and a layout check on a phone, not a redesign. The protocol, the Lua join script and the results code all read `MAX_PLAYERS`; the one other place the number lives is the `/5 players` label in `RoomPage.tsx`, which is hard-coded and has to change with it. A sixth player gets the existing `room_full` error, which the client already shows.
