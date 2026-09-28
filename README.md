@@ -8,7 +8,7 @@ Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew an
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M5 complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
+> Status: **v1.0** — every planned feature is built; the visual pass (M6) is next. Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
 
 ## How scoring works
 
@@ -29,15 +29,15 @@ What you see is what you type: every text is normalized once at import (niqqud a
 
 ## What it looks like
 
-A real race, recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. Nothing here is staged — Nell and Sami are two browser sessions typing at different speeds, and 144.62 / 107.46 are the numbers the server computed.
+A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 75 ms and 105 ms per key — which is why the speeds (144.62 and 107.46 WPM) are faster than most people type. Everything else is the real stack: the server's countdown, the relay, the validator and the numbers it computed. A steady 75 ms rhythm is inside the human range, so the validator accepts it; it is built to reject pasted text and machine-speed input, not a script that types at a human pace (see [How scoring works](#how-scoring-works)).
 
 ![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars advancing as the text turns green right to left, and the server's results with places and WPM](docs/img/race-hebrew.gif)
 
-Practising in Arabic, mid-run. Green is behind the caret, the pink cell is a character typed wrong — and the letters stay joined across it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). Speed, accuracy and errors update as you type; the numbers that count are the server's.
+Practising in Arabic, mid-run (typed by the same kind of script, with deliberate mistakes). Green is behind the caret, the pink cell is a character typed wrong — and the letters stay joined across it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). Speed, accuracy and errors update as you type; the numbers that count are the server's.
 
 ![The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter, and live WPM, accuracy and error counts underneath](docs/img/practice-arabic.png)
 
-The stats page: best and average per language, the last runs as a trend, and the keys you miss on the layout you actually type on — here Arabic 101. A key with no data is dashed rather than coloured, so "never typed" cannot be read as "never missed".
+The stats page, filled by scripted practice runs: best and average per language, the last runs as a trend, and the keys you miss on the layout you actually type on — here Arabic 101. A key with no data is dashed rather than coloured, so "never typed" cannot be read as "never missed".
 
 ![The stats page: per-language cards, a WPM trend line, and an Arabic keyboard heatmap where missed keys are shaded red](docs/img/stats-heatmap.png)
 
