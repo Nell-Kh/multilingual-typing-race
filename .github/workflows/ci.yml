@@ -5,10 +5,12 @@ on:
   push:
     branches: [main]
 
-# If you push twice to the same PR, cancel the older run.
+# If you push twice to the same PR, cancel the older run. Never on main: every
+# merge gets its own complete run, so two merges a minute apart do not leave the
+# first one marked "cancelled" with no record of whether it passed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   backend:
