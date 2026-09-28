@@ -86,6 +86,29 @@ describe('auth flow', () => {
     expect(seen).toEqual(['Bearer tok'])
   })
 
+  it('says what it is doing while the login is in flight, and cannot be sent twice', async () => {
+    let answer: (r: Response) => void = () => {}
+    mockApi((url) => {
+      if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
+      if (url.endsWith('/auth/login')) return new Promise<Response>((resolve) => (answer = resolve))
+      throw new Error(`unexpected ${url}`)
+    })
+    render(<App />)
+    const user = userEvent.setup()
+
+    await screen.findByRole('heading', { name: 'Log in' })
+    await user.type(screen.getByLabelText('Email'), 'nell@example.com')
+    await user.type(screen.getByLabelText('Password'), 'correct horse battery')
+    await user.click(screen.getByRole('button', { name: 'Log in' }))
+
+    const busy = await screen.findByRole('button', { name: 'Logging in…' })
+    expect(busy).toBeDisabled()
+    expect(busy).toHaveAttribute('aria-busy', 'true')
+    answer(json({ error: { code: 'invalid_credentials', message: 'Email or password is incorrect' } }, 401))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email or password is incorrect')
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeEnabled()
+  })
+
   it('shows the API error message on a bad login', async () => {
     mockApi((url) => {
       if (url.endsWith('/auth/refresh')) return json({ error: {} }, 401)
