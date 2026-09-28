@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from app import cli
 from app.models import Language
-from app.services.stats import daily_index
+from app.services.stats import APP_TZ, daily_index, period_start, today
 
 pytestmark = pytest.mark.db
 
@@ -303,7 +303,7 @@ async def test_daily_text_is_the_same_for_everyone_and_scores_its_own_board(
     first = (await seeded.get(DAILY, params={"lang": "he"})).json()
     second = (await seeded.get(DAILY, params={"lang": "he"})).json()
     assert first["text"]["id"] == second["text"]["id"]
-    assert first["day"] == datetime.now(UTC).date().isoformat()
+    assert first["day"] == datetime.now(APP_TZ).date().isoformat()
     text = first["text"]
 
     await _run(seeded, nell, text, gap_ms=150, mode="daily")  # 80
@@ -338,3 +338,37 @@ async def test_daily_mode_refuses_any_other_text(seeded: AsyncClient) -> None:
 
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "not_daily_text"
+
+
+# ---- the app's calendar (ADR-030) ---------------------------------------------------------
+
+
+def _utc(text: str) -> datetime:
+    return datetime.fromisoformat(text).replace(tzinfo=UTC)
+
+
+def test_the_daily_challenge_turns_over_at_midnight_in_israel() -> None:
+    # 22:30 UTC on 28 Sept is 01:30 on the 29th in Israel (summer time, UTC+3).
+    assert today(_utc("2026-09-28T22:30")) == date(2026, 9, 29)
+    # 20:59 UTC is still 23:59 on the 28th.
+    assert today(_utc("2026-09-28T20:59")) == date(2026, 9, 28)
+    # Winter (UTC+2): 21:30 UTC on 15 Jan is 23:30 local, still the 15th.
+    assert today(_utc("2026-01-15T21:30")) == date(2026, 1, 15)
+    assert today(_utc("2026-01-15T22:00")) == date(2026, 1, 16)
+
+
+def test_the_day_board_starts_at_local_midnight_all_year() -> None:
+    summer = period_start("day", _utc("2026-09-28T22:30"))
+    assert summer == _utc("2026-09-28T21:00")  # 00:00 on the 29th, UTC+3
+    winter = period_start("day", _utc("2026-01-15T12:00"))
+    assert winter == _utc("2026-01-14T22:00")  # 00:00 on the 15th, UTC+2
+    # The day the clocks go back (25 Oct 2026, at 02:00): midnight was still UTC+3.
+    assert period_start("day", _utc("2026-10-25T12:00")) == _utc("2026-10-24T21:00")
+
+
+def test_the_week_board_starts_at_local_midnight_on_monday() -> None:
+    # 00:30 on Monday 28 Sept in Israel is still Sunday in UTC: the new week has
+    # started here, and a UTC boundary would still be showing last week.
+    assert period_start("week", _utc("2026-09-27T21:30")) == _utc("2026-09-27T21:00")
+    assert period_start("week", _utc("2026-10-01T09:00")) == _utc("2026-09-27T21:00")
+    assert period_start("all", _utc("2026-10-01T09:00")) is None

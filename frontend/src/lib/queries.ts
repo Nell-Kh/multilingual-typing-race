@@ -13,8 +13,9 @@ import { daily, type Daily, type Language, type Text } from './api'
 /**
  * Today's challenge for one language, cached exactly as the server sends it.
  *
- * `staleTime: Infinity` because the text is fixed for the whole UTC day: without it a
- * window-focus refetch could swap the text out from under someone mid-run.
+ * `staleTime: Infinity` because the text is fixed for the whole day, midnight to midnight
+ * Israel time (ADR-030): without it a window-focus refetch could swap the text out from
+ * under someone mid-run.
  */
 export function dailyQuery(language: Language) {
   return queryOptions({

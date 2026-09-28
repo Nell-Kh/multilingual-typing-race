@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import Float, Integer, cast, func, select, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,13 @@ Ranking = Literal["standard", "dense"]
 RECENT_FOR_AVERAGES = 20
 TREND_POINTS = 30
 LEADERBOARD_LIMIT = 50
+
+# The app's calendar (ADR-030). The daily challenge turns over, and the "day" and
+# "week" boards start, at midnight here — not at midnight UTC, which is 02:00 or
+# 03:00 for the players this app is for. ZoneInfo follows daylight saving, so the
+# boundary is local midnight all year; a fixed +02:00 would be an hour off every
+# summer. Israel changes the clocks at 02:00, so local midnight always exists.
+APP_TZ = ZoneInfo("Asia/Jerusalem")
 
 
 # ---- personal stats -------------------------------------------------------------------
@@ -189,12 +197,12 @@ class LeaderboardRow:
 
 
 def period_start(period: Period, now: datetime | None = None) -> datetime | None:
-    """UTC day / ISO week boundaries; None means no lower bound."""
-    now = now or datetime.now(UTC)
+    """Local midnight today / on Monday in APP_TZ; None means no lower bound."""
+    local = (now or datetime.now(UTC)).astimezone(APP_TZ)
     if period == "day":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return local.replace(hour=0, minute=0, second=0, microsecond=0)
     if period == "week":
-        monday = now - timedelta(days=now.weekday())
+        monday = local - timedelta(days=local.weekday())
         return monday.replace(hour=0, minute=0, second=0, microsecond=0)
     return None
 
@@ -293,5 +301,6 @@ async def daily_text(session: AsyncSession, language: Language, day: date) -> Te
     return await session.get(Text, ids[daily_index(day, language, len(ids))])
 
 
-def today() -> date:
-    return datetime.now(UTC).date()
+def today(now: datetime | None = None) -> date:
+    """The date the daily challenge belongs to: the calendar date in APP_TZ."""
+    return (now or datetime.now(UTC)).astimezone(APP_TZ).date()
