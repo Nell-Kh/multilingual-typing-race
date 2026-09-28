@@ -9,6 +9,7 @@ import {
 } from "../../i18n/languages";
 import {
   ApiError,
+  leaderboards,
   sessions,
   texts,
   type Language,
@@ -19,6 +20,9 @@ import { isLanguage } from "../../i18n/languages";
 import { initialState, liveStats, reduce } from "../typing-engine/engine";
 import { TypingBox } from "../typing-engine/TypingBox";
 import { ResultsCard } from "./ResultsCard";
+import { Button } from "../../ui/Button";
+import { Segmented } from "../../ui/Segmented";
+import { StatStrip } from "../../ui/StatStrip";
 import { useTitle } from "../../ui/useTitle";
 
 type Difficulty = 1 | 2 | 3;
@@ -87,6 +91,20 @@ export default function PracticePage() {
   }, [engine.startedAt, engine.finished]);
   const stats = liveStats(engine, now);
 
+  // Daily: once a run is scored, where the player stands on today's board.
+  const dailyBoard = useQuery({
+    queryKey: ["daily", "board", language, submit.data?.id],
+    queryFn: () => leaderboards.daily(language),
+    enabled: isDaily && submit.isSuccess,
+    retry: false,
+  });
+
+  /** Start the same text over: Esc, the Restart button, or Try again. */
+  function restart() {
+    submit.reset();
+    dispatch({ type: "reset", target: text.data?.content ?? "" });
+  }
+
   function next() {
     submit.reset();
     // Free practice fetches a different text, and the effect above resets the engine.
@@ -102,72 +120,51 @@ export default function PracticePage() {
     submit.reset();
   }
 
+  const seconds = stats.elapsedMs / 1000;
+
   return (
-    <main className="flex flex-col gap-6 p-4 sm:p-8">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
+    <main className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="m-0 text-2xl font-bold sm:text-3xl">
           {isDaily ? "Daily challenge" : "Practice"}
         </h1>
+        {isDaily && (
+          <p className="m-0 text-sm text-muted">
+            One text per day, the same for everyone.{" "}
+            <Link className="font-medium text-accent underline" to="/practice">
+              Free practice
+            </Link>
+          </p>
+        )}
       </header>
 
-      {isDaily && (
-        <p className="text-sm text-gray-500">
-          One text per day, the same for everyone.{" "}
-          <Link className="underline" to="/practice">
-            Free practice
-          </Link>
-        </p>
-      )}
-
       {!isDaily && (
-        <div
-          className="flex items-center gap-3"
-          role="group"
-          aria-label="Language"
-        >
-          <span className="text-sm">Language</span>
-          {LANGUAGE_CODES.map((code) => (
-            <button
-              key={code}
-              type="button"
-              lang={code}
-              onClick={() => pickLanguage(code)}
-              className={`rounded border min-w-11 px-3 py-2 ${code === language ? "bg-blue-600 text-white" : ""}`}
-              aria-pressed={code === language}
-            >
-              {LANGUAGES[code].label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Segmented
+            label="Language"
+            value={language}
+            onChange={pickLanguage}
+            options={LANGUAGE_CODES.map((code) => ({
+              value: code,
+              label: LANGUAGES[code].label,
+              lang: code,
+            }))}
+          />
+          <Segmented
+            label="Difficulty"
+            value={difficulty}
+            onChange={(d) => {
+              setDifficulty(d);
+              next();
+            }}
+            options={([1, 2, 3] as const).map((d) => ({ value: d, label: d }))}
+          />
         </div>
       )}
 
-      {!isDaily && (
-        <div
-          className="flex items-center gap-3"
-          role="group"
-          aria-label="Difficulty"
-        >
-          <span className="text-sm">Difficulty</span>
-          {([1, 2, 3] as const).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => {
-                setDifficulty(d);
-                next();
-              }}
-              className={`rounded border min-w-11 px-3 py-2 ${d === difficulty ? "bg-blue-600 text-white" : ""}`}
-              aria-pressed={d === difficulty}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {text.isPending && <p>Loading text…</p>}
+      {text.isPending && <p className="m-0 text-muted">Loading text…</p>}
       {text.isError && (
-        <p role="alert" className="text-red-600">
+        <p role="alert" className="m-0 text-err">
           {text.error instanceof ApiError
             ? text.error.message
             : "Could not load a text"}
@@ -180,65 +177,53 @@ export default function PracticePage() {
             state={engine}
             language={text.data.language}
             onInput={(value, at) => dispatch({ type: "input", value, at })}
+            onRestart={restart}
           />
-          <dl className="flex gap-8 font-mono text-sm" aria-label="live stats">
-            <div>
-              <dt className="text-gray-500">time</dt>
-              <dd data-testid="live-time">
-                {(stats.elapsedMs / 1000).toFixed(1)}s
-              </dd>
-            </div>
-            <div>
-              <dt className="text-gray-500">wpm</dt>
-              <dd data-testid="live-wpm">{stats.wpm}</dd>
-            </div>
-            <div>
-              <dt className="text-gray-500">accuracy</dt>
-              <dd data-testid="live-accuracy">{stats.accuracy}%</dd>
-            </div>
-            <div>
-              <dt className="text-gray-500">errors</dt>
-              <dd data-testid="live-errors">{stats.errors}</dd>
-            </div>
-          </dl>
-          <p className="text-xs text-gray-500">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <StatStrip
+              label="live stats"
+              stats={[
+                { label: "Speed", value: stats.wpm, testId: "live-wpm" },
+                { label: "Accuracy", value: `${stats.accuracy}%`, testId: "live-accuracy" },
+                { label: "Errors", value: stats.errors, testId: "live-errors" },
+                { label: "Time", value: `${seconds.toFixed(1)}s`, testId: "live-time" },
+              ]}
+            />
+            <Button onClick={restart} title="Start this text over (Esc)">
+              Restart
+            </Button>
+          </div>
+          <p className="m-0 text-xs text-muted">
             {text.data.source} · {text.data.license}
           </p>
         </>
       )}
 
-      {submit.isPending && <p>Scoring…</p>}
+      {submit.isPending && <p className="m-0 text-muted">Scoring…</p>}
       {submit.isError && (
-        <div role="alert" className="flex items-center gap-4 text-red-600">
+        <div role="alert" className="flex flex-wrap items-center gap-4 text-err">
           <span>
             {submit.error instanceof ApiError
               ? submit.error.message
               : "Could not reach the server to save the session"}
           </span>
-          <button
-            type="button"
-            onClick={() => submit.mutate()}
-            className="rounded border border-current px-3 py-2 text-sm"
-          >
-            Retry
-          </button>
+          <Button onClick={() => submit.mutate()}>Retry</Button>
         </div>
       )}
-      {submit.data && !isDaily && (
-        <ResultsCard result={submit.data} onNext={next} />
-      )}
-      {submit.data && isDaily && (
-        <>
-          <ResultsCard result={submit.data} onNext={next} />
-          <p className="text-sm">
-            <Link
-              className="underline"
-              to={`/leaderboard?daily=1&lang=${language}`}
-            >
-              See today&apos;s leaderboard
-            </Link>
-          </p>
-        </>
+      {submit.data && (
+        <ResultsCard
+          result={submit.data}
+          onNext={isDaily ? undefined : next}
+          onRetry={restart}
+          daily={
+            isDaily
+              ? {
+                  href: `/leaderboard?daily=1&lang=${language}`,
+                  me: dailyBoard.isSuccess ? dailyBoard.data.me : undefined,
+                }
+              : undefined
+          }
+        />
       )}
     </main>
   );
