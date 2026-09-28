@@ -2,6 +2,10 @@
 
 A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice alone or race friends in real time, track WPM / accuracy / weak keys over time, leaderboards per language, daily challenge.
 
+Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew and Arabic arrive with vowel marks the keyboard cannot produce, with typographic punctuation that is not the punctuation on the key, and with letters that look the same to a reader and are different characters to a computer — ך and כ, أ and ا. Arabic letters change shape depending on their neighbours, so a renderer that draws one character at a time breaks the word. Every text here is normalized once at import so that what is displayed is exactly what a keyboard can produce, and the renderer keeps the shaping intact ([docs/rtl-notes.md](docs/rtl-notes.md)).
+
+**The server is the judge.** The browser never sends a score. It sends the raw keystroke log — `[t_ms, expected, typed]` per key — and the server replays it, recomputes every number, and decides whether the run counts at all. A client that lies has to lie in a log that replays to the target text at a human rhythm.
+
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
 > Status: **M5 complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
@@ -37,6 +41,41 @@ The stats page: best and average per language, the last runs as a trend, and the
 
 Email and password (argon2), a short-lived access token held in memory and a rotating refresh token in an httpOnly cookie: using a refresh token spends it, so a stolen one stops working the moment the real user refreshes. Registration, login and refresh are rate-limited in Redis — per client address, plus a counter of failed logins per email address that any successful login clears. Ceilings are environment settings, not constants. See [ADR-009](docs/DECISIONS.md) and [ADR-022](docs/DECISIONS.md).
 
+## How it fits together
+
+```mermaid
+flowchart LR
+    B["Browser<br/>React 19 · typing engine<br/>one span per character"]
+    W["nginx<br/>static bundle"]
+    A["FastAPI<br/>async SQLAlchemy<br/>scoring · validation"]
+    A2["another API replica"]
+    P[("PostgreSQL 16<br/>users · texts · sessions<br/>races · per-key stats")]
+    R[("Redis 7<br/>refresh ids · room state<br/>rate limits · pub/sub")]
+
+    B -- "page load" --> W
+    B -- "HTTPS /api/v1" --> A
+    B <-- "WebSocket /rooms/:code/ws" --> A
+    A --> P
+    A --> R
+    A2 --> R
+    R -. "pub/sub fan-out: any replica<br/>can serve any racer in a room" .-> A2
+```
+
+A race is not held in one process. Room state is a Redis hash with a TTL, joins are a Lua script so two players cannot take the last seat, and every frame is published to a channel — so the five players in a room can be spread across replicas and still see the same countdown. Details in [docs/race-protocol.md](docs/race-protocol.md); the reasoning in ADR-018.
+
+```mermaid
+sequenceDiagram
+    participant C as Browser
+    participant S as API
+    participant V as validator
+    C->>S: POST /sessions { text_id, started_at, keystrokes }
+    S->>S: replay the log → does it reproduce the text?
+    S->>V: median gap, machine-run, monotonic time, server clock
+    V-->>S: valid / invalid + reason
+    S->>S: recompute WPM, CPM, accuracy, per-key stats
+    S-->>C: the server's numbers (the client's were display only)
+```
+
 ## Stack
 
 - **Backend:** Python 3.13, FastAPI, SQLAlchemy 2.0 (async) + asyncpg, Alembic, PostgreSQL 16, Redis 7
@@ -69,6 +108,11 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
+**195 backend tests** (pytest, against a real PostgreSQL and Redis), **67 frontend tests**
+(Vitest + Testing Library) and a **3-case end-to-end smoke test** that boots the stack and
+drives the built frontend with Playwright. All three run in CI on every pull request
+([e2e/README.md](e2e/README.md)).
+
 ## Repo layout
 
 ```
@@ -100,6 +144,7 @@ Not built yet. Everything above this section describes what is in the repo today
 
 - **M6 — the visual pass.** The current interface is deliberately plain: correct behaviour, default styling. M6 is the design of every page, dark mode included.
 - **Interface translations.** Hebrew and Arabic labels with a mirrored layout, deferred to M6 so the strings are translated once against the final UI (ADR-017). The text language and the interface language stay independent: a Hebrew speaker can practise English typing in a Hebrew interface.
+- **Everything else that was considered and deliberately left out** — a background worker, OAuth, race replay, lenient Arabic matching, materialized views, keystroke retention — is listed with its reasoning in ADR-027.
 
 ## Docs
 

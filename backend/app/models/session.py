@@ -65,7 +65,9 @@ class TypingSession(Base):
 
     is_valid: Mapped[bool]
     invalid_reason: Mapped[str | None] = mapped_column(String(64))
-    # Raw log [[t_ms, expected, typed], ...]; pruned to NULL after 30 days by a cron job (M5).
+    # Raw log [[t_ms, expected, typed], ...]. Kept indefinitely: it is what makes a run
+    # re-verifiable, and there is no scheduler to prune it (ADR-027). Retention is an
+    # open decision, not a solved one.
     keystrokes: Mapped[list[Any] | None] = mapped_column(JSONB)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
