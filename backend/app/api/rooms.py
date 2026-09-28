@@ -9,6 +9,7 @@ import contextlib
 import json
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import Any
 
@@ -62,7 +63,9 @@ async def create_room(
 
 @router.get("/{code}")
 async def preview_room(code: str, request: Request) -> RoomOut:
-    room = await get_rooms(request).get_room(code.upper())
+    rooms = get_rooms(request)
+    await rooms.tick(code.upper())
+    room = await rooms.get_room(code.upper())
     if room is None:
         raise ApiError(404, "not_found", "Room not found or expired")
     return RoomOut.from_snapshot(room.snapshot())
@@ -110,11 +113,23 @@ async def _authenticate(websocket: WebSocket, auth_timeout: float) -> User | Non
     return user
 
 
-async def _relay(pubsub: PubSub, websocket: WebSocket) -> None:
-    """Forward every event published for this room to this socket (§7)."""
-    async for message in pubsub.listen():
-        if message["type"] == "message":
+async def _relay(
+    pubsub: PubSub, websocket: WebSocket, rooms: RoomService, code: str, tick_seconds: float
+) -> None:
+    """Forward every event published for this room to this socket (§7), and tick the
+    room while waiting, so an overdue transition happens even if the replica that
+    armed its timer is gone (ADR-031)."""
+    next_tick = time.monotonic() + tick_seconds
+    while True:
+        message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=tick_seconds)
+        if message is not None and message["type"] == "message":
             await websocket.send_text(message["data"].decode())
+        if time.monotonic() >= next_tick:
+            next_tick = time.monotonic() + tick_seconds
+            try:
+                await rooms.tick(code)
+            except Exception:  # one failed tick is retried by the next; keep relaying
+                log.exception("room %s: relay tick failed", code)
 
 
 async def _send_error(websocket: WebSocket, code: str, message: str) -> None:
@@ -132,6 +147,9 @@ async def room_socket(websocket: WebSocket, code: str) -> None:
     if user is None:
         return
     player_id = str(user.id)
+    # This socket's identity. The same account in a second tab is the same player
+    # with a new connection; only the newest one can mark the player gone (ADR-031).
+    conn = uuid.uuid4().hex
 
     # Subscribe *before* joining so no event between join and snapshot is missed,
     # but only start forwarding *after* the snapshot: the reply to `auth` must be
@@ -139,14 +157,16 @@ async def room_socket(websocket: WebSocket, code: str) -> None:
     pubsub = rooms.redis.pubsub()
     await pubsub.subscribe(rooms.channel(code))
     try:
-        room = await rooms.join(code, user)
+        room = await rooms.join(code, user, conn)
     except RoomError as exc:
         await pubsub.aclose()  # type: ignore[no-untyped-call]
         await _send_error(websocket, exc.code, exc.message)
         await websocket.close(code=WS_REJECTED, reason=exc.code)
         return
     await websocket.send_json(room.snapshot())
-    relay = asyncio.create_task(_relay(pubsub, websocket))
+    relay = asyncio.create_task(_relay(pubsub, websocket, rooms, code, settings.room_tick_seconds))
+    # Per socket, so a reconnect starts a fresh interval. That lets a client send one
+    # extra progress frame per reconnect, which is harmless: progress is display only.
     last_progress = 0.0
     try:
         while True:
@@ -157,6 +177,7 @@ async def room_socket(websocket: WebSocket, code: str) -> None:
                 break
             kind = raw.get("type") if isinstance(raw, dict) else None
             try:
+                await rooms.tick(code)  # act on the room as it is now, not as it was
                 if kind == "start":
                     await rooms.start(code, player_id)
                 elif kind == "progress":
@@ -188,6 +209,7 @@ async def room_socket(websocket: WebSocket, code: str) -> None:
             await relay
         with contextlib.suppress(Exception):
             await pubsub.aclose()  # type: ignore[no-untyped-call]
-        player = await rooms.get_player(code, player_id)
-        if player is not None and player.connected:
-            await rooms.mark_disconnected(code, player_id)
+        try:
+            await rooms.mark_disconnected(code, player_id, conn)
+        except Exception:  # the socket is gone either way; don't raise out of cleanup
+            log.exception("room %s: could not mark %s disconnected", code, player_id)

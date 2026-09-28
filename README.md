@@ -67,7 +67,7 @@ flowchart LR
     R -. "pub/sub fan-out: any replica<br/>can serve any racer in a room" .-> A2
 ```
 
-A race is not held in one process. Room state is a Redis hash with a TTL, joins are a Lua script so two players cannot take the last seat, and every frame is published to a channel — so the five players in a room can be spread across replicas and still see the same countdown. Details in [docs/race-protocol.md](docs/race-protocol.md); the reasoning in ADR-018.
+A race is not held in one process. Room state is a Redis hash with a TTL, every change that could race — joining the last seat, starting, each timed transition — is a Lua compare-and-set, and every frame is published to a channel. The countdown and the race deadline are stored in the room and applied by whichever server next looks at it, so a redeploy mid-race costs the players a reconnect, not the race, and the players in a room can be spread across replicas. Details in [docs/race-protocol.md](docs/race-protocol.md); the reasoning in ADR-018 and ADR-031, including what is still not covered.
 
 ```mermaid
 sequenceDiagram
@@ -114,7 +114,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**198 backend tests** (pytest, against a real PostgreSQL and Redis), **72 frontend tests**
+**209 backend tests** (pytest, against a real PostgreSQL and Redis), **72 frontend tests**
 (Vitest + Testing Library) and a **3-case end-to-end smoke test** that boots the stack and
 drives the built frontend with Playwright. All three run in CI on every pull request
 ([e2e/README.md](e2e/README.md)).
