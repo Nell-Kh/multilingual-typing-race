@@ -18,6 +18,9 @@ from app.core.pagination import Cursor
 from app.models import Language, SessionKeyStat, SessionMode, Text, TypingSession, User
 
 Period = Literal["day", "week", "all"]
+# How a tie is numbered: "standard" leaves a gap after it (1, 2, 2, 4),
+# "dense" does not (1, 2, 2, 3). See ADR-025.
+Ranking = Literal["standard", "dense"]
 RECENT_FOR_AVERAGES = 20
 TREND_POINTS = 30
 LEADERBOARD_LIMIT = 50
@@ -204,9 +207,15 @@ async def leaderboard(
     limit: int | None = LEADERBOARD_LIMIT,
     mode: SessionMode | None = None,
     text_id: uuid.UUID | None = None,
+    ranking: Ranking = "standard",
     now: datetime | None = None,
 ) -> list[LeaderboardRow]:
-    """Each user's single best valid run in the window, ranked by WPM."""
+    """Each user's single best valid run in the window, ranked by WPM.
+
+    The rank comes from the database, not from the row's position (ADR-025): two
+    players with the same WPM are the same rank, and the number a player is shown
+    does not change with how much of the board was fetched.
+    """
     conditions = [TypingSession.language == language, TypingSession.is_valid.is_(True)]
     since = period_start(period, now)
     if since is not None:
@@ -228,26 +237,36 @@ async def leaderboard(
         )
         .subquery()
     )
+    # rank() leaves a gap after a tie (1, 2, 2, 4); dense_rank() does not (1, 2, 2, 3).
+    rank_fn = func.dense_rank() if ranking == "dense" else func.rank()
+    ranked = (
+        select(
+            best.c.user_id,
+            User.display_name,
+            best.c.wpm,
+            best.c.accuracy,
+            best.c.started_at,
+            rank_fn.over(order_by=best.c.wpm.desc()).label("rank"),
+        )
+        .join(User, User.id == best.c.user_id)
+        .subquery()
+    )
     rows = (
         await session.execute(
-            select(
-                best.c.user_id, User.display_name, best.c.wpm, best.c.accuracy, best.c.started_at
-            )
-            .join(User, User.id == best.c.user_id)
-            .order_by(best.c.wpm.desc(), best.c.started_at.asc())
-            .limit(limit)
+            # Ties share a rank, so the earlier run is listed first within one.
+            select(ranked).order_by(ranked.c.rank.asc(), ranked.c.started_at.asc()).limit(limit)
         )
     ).all()  # limit=None means the whole board
     return [
         LeaderboardRow(
-            rank=i + 1,
+            rank=int(rank),
             user_id=user_id,
             display_name=name,
             wpm=wpm,
             accuracy=accuracy,
             started_at=started_at,
         )
-        for i, (user_id, name, wpm, accuracy, started_at) in enumerate(rows)
+        for user_id, name, wpm, accuracy, started_at, rank in rows
     ]
 
 

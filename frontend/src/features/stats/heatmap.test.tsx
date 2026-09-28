@@ -30,6 +30,27 @@ describe('keyboard heatmap', () => {
     expect(a).toHaveAttribute('title', 'A: 10 missed of 100 (10%)')
   })
 
+  it('does not colour a key that has barely been pressed', () => {
+    // One miss out of two is not a 50% error rate, it is two keystrokes (ADR-025).
+    render(<Heatmap language="en" keys={[key('a', 1, 1), key('s', 95, 5)]} />)
+
+    const barely = screen.getByTestId('key-a')
+    expect(barely).toHaveAttribute('data-error-rate', '')
+    expect(barely.className).toContain('border-dashed')
+    expect(barely).toHaveAttribute('title', 'A: only 2 so far, too few to judge')
+    // ... while a key with a real sample is coloured as before.
+    expect(screen.getByTestId('key-s')).toHaveAttribute('data-error-rate', '0.0500')
+  })
+
+  it('judges a key as soon as its characters add up to the minimum', () => {
+    // The sample is the key's, not each character's: 6 + 4 clears the floor.
+    render(<Heatmap language="en" keys={[key('a', 5, 1), key('A', 3, 1)]} />)
+
+    const a = screen.getByTestId('key-a')
+    expect(a).toHaveAttribute('data-error-rate', '0.2000')
+    expect(a).toHaveAttribute('title', 'A: 2 missed of 10 (20%)')
+  })
+
   it('sums the characters that share one key', () => {
     render(<Heatmap language="en" keys={[key('a', 40, 5), key('A', 10, 5)]} />)
 

@@ -36,7 +36,14 @@ const BINS: Bin[] = [
   { max: Infinity, label: '10%+', className: 'bg-red-400 dark:bg-red-500/85' },
 ]
 
-const NO_DATA = 'border-dashed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'
+/**
+ * Below this many keystrokes a key is not coloured at all (ADR-025). One miss out
+ * of two is not a 50% error rate, it is two keystrokes; colouring it would put the
+ * darkest cell on the board on the key you have pressed least.
+ */
+const MIN_SAMPLE = 10
+
+const UNJUDGED = 'border-dashed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'
 
 function binOf(errorRate: number): Bin {
   return BINS.find((b) => errorRate < b.max) ?? BINS[BINS.length - 1]
@@ -74,20 +81,23 @@ export function Heatmap({ language, keys }: Props) {
           <div key={i} className="flex gap-1">
             {row.map((key, j) => {
               const { errors, total, errorRate } = statsFor(key, byChar)
+              const judged = total >= MIN_SAMPLE
               const pct = (errorRate * 100).toFixed(errorRate >= 0.1 ? 0 : 1)
-              const title = total
+              const title = judged
                 ? `${key.label}: ${errors} missed of ${total} (${pct}%)`
-                : `${key.label}: not typed yet`
+                : total
+                  ? `${key.label}: only ${total} so far, too few to judge`
+                  : `${key.label}: not typed yet`
               return (
                 <span
                   key={j}
                   title={title}
                   aria-label={title}
                   data-testid={`key-${key.chars[0] ?? key.label}`}
-                  data-error-rate={total ? errorRate.toFixed(4) : ''}
+                  data-error-rate={judged ? errorRate.toFixed(4) : ''}
                   style={key.width ? { width: `${key.width * 2.5}rem` } : undefined}
                   className={`flex h-10 w-10 items-center justify-center rounded border text-sm
-                    ${total ? binOf(errorRate).className : NO_DATA}`}
+                    ${judged ? binOf(errorRate).className : UNJUDGED}`}
                 >
                   {key.label}
                 </span>
@@ -106,8 +116,8 @@ export function Heatmap({ language, keys }: Props) {
           </span>
         ))}
         <span className="flex items-center gap-1">
-          <span className={`inline-block h-3 w-3 rounded-sm border ${NO_DATA}`} />
-          not typed
+          <span className={`inline-block h-3 w-3 rounded-sm border ${UNJUDGED}`} />
+          under {MIN_SAMPLE} keystrokes
         </span>
       </div>
 

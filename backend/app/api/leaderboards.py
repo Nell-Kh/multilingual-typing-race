@@ -13,7 +13,7 @@ from app.models import Language, SessionMode, User
 from app.schemas.stats import DailyOut, LeaderboardOut, LeaderboardRowOut
 from app.schemas.text import TextOut
 from app.services import stats, users
-from app.services.stats import Period
+from app.services.stats import Period, Ranking
 
 router = APIRouter(tags=["leaderboards"])
 
@@ -39,9 +39,10 @@ async def _board(
     viewer: User | None,
     mode: SessionMode | None = None,
     text_id: uuid.UUID | None = None,
+    ranking: Ranking = "standard",
 ) -> LeaderboardOut:
     rows = await stats.leaderboard(
-        session, language=language, period=period, mode=mode, text_id=text_id
+        session, language=language, period=period, mode=mode, text_id=text_id, ranking=ranking
     )
     me = None
     if viewer is not None:
@@ -49,7 +50,13 @@ async def _board(
         if mine is None:
             # Not in the top N: rank them against the whole board.
             everyone = await stats.leaderboard(
-                session, language=language, period=period, mode=mode, text_id=text_id, limit=None
+                session,
+                language=language,
+                period=period,
+                mode=mode,
+                text_id=text_id,
+                ranking=ranking,
+                limit=None,
             )
             mine = next((r for r in everyone if r.user_id == viewer.id), None)
         me = LeaderboardRowOut(**mine.__dict__) if mine else None
@@ -96,4 +103,7 @@ async def get_daily_leaderboard(
         viewer=viewer,
         mode=SessionMode.DAILY,
         text_id=text.id,
+        # One text, one day: ties are common and a gap after each one reads as a
+        # missing player, so the daily board numbers them densely (ADR-025).
+        ranking="dense",
     )

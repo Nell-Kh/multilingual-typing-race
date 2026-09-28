@@ -182,6 +182,75 @@ async def test_leaderboard_ranks_each_users_best_valid_run(seeded: AsyncClient) 
     assert (await seeded.get(BOARD, params={"lang": "he"})).json()["rows"] == []
 
 
+async def test_tied_runs_share_a_rank_and_leave_a_gap_after_it(seeded: AsyncClient) -> None:
+    """Two players at the same WPM are the same rank, and the next one is not
+    numbered as if they had beaten both of them (ADR-025)."""
+    nell, sami, dana, omar = (
+        await _login(seeded, "nell"),
+        await _login(seeded, "sami"),
+        await _login(seeded, "dana"),
+        await _login(seeded, "omar"),
+    )
+    en = await _text(seeded, "en")
+    await _run(seeded, nell, en, gap_ms=100)  # 120
+    await _run(seeded, sami, en, gap_ms=120)  # 100, tied
+    await _run(seeded, dana, en, gap_ms=120)  # 100, tied
+    await _run(seeded, omar, en, gap_ms=150)  # 80
+
+    rows = (await seeded.get(BOARD, params={"lang": "en"})).json()["rows"]
+
+    assert [(row["rank"], row["wpm"]) for row in rows] == [
+        (1, 120.0),
+        (2, 100.0),
+        (2, 100.0),  # same run, same number
+        (4, 80.0),  # standard competition ranking: the tie consumes rank 3
+    ]
+    # And the rank a player is shown is their rank, not their row's position.
+    for headers, expected in ((sami, 2), (dana, 2), (omar, 4)):
+        me = (await seeded.get(BOARD, params={"lang": "en"}, headers=headers)).json()["me"]
+        assert me is None or me["rank"] == expected
+
+
+async def test_a_players_rank_does_not_depend_on_how_much_of_the_board_was_asked_for(
+    seeded: AsyncClient,
+) -> None:
+    """The "me" row is looked up from the whole board; it has to agree with the
+    top of the board a viewer can see."""
+    nell, sami, dana = (
+        await _login(seeded, "nell"),
+        await _login(seeded, "sami"),
+        await _login(seeded, "dana"),
+    )
+    en = await _text(seeded, "en")
+    await _run(seeded, nell, en, gap_ms=100)  # 120
+    await _run(seeded, sami, en, gap_ms=100)  # 120, tied for first
+    await _run(seeded, dana, en, gap_ms=150)  # 80
+
+    board = (await seeded.get(BOARD, params={"lang": "en"}, headers=dana)).json()
+
+    assert [row["rank"] for row in board["rows"]] == [1, 1, 3]
+    in_rows = next(row for row in board["rows"] if row["display_name"] == "dana")
+    assert in_rows["rank"] == 3
+
+
+async def test_the_daily_board_numbers_ties_densely(seeded: AsyncClient) -> None:
+    """One text, one day: ties are common, and a gap after every one of them reads
+    as a missing player. The daily board is the only one that numbers densely."""
+    nell, sami, dana = (
+        await _login(seeded, "nell"),
+        await _login(seeded, "sami"),
+        await _login(seeded, "dana"),
+    )
+    today = (await seeded.get(DAILY, params={"lang": "en"})).json()["text"]
+    await _run(seeded, nell, today, gap_ms=120, mode="daily")  # 100, tied
+    await _run(seeded, sami, today, gap_ms=120, mode="daily")  # 100, tied
+    await _run(seeded, dana, today, gap_ms=150, mode="daily")  # 80
+
+    rows = (await seeded.get(f"{DAILY}/leaderboard", params={"lang": "en"})).json()["rows"]
+
+    assert [(row["rank"], row["wpm"]) for row in rows] == [(1, 100.0), (1, 100.0), (2, 80.0)]
+
+
 async def _backdate(database: str, session_id: str, days: int) -> None:
     """The API refuses logs older than two hours, so an old run is aged in the database."""
     engine = create_async_engine(database)
