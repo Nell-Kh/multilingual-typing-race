@@ -292,3 +292,13 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **The race screen is one row per player above the text.** Every extra row pushes the sentence further down, and a player cannot scroll while typing. Five rows leave the text where the eye already is.
   - The use case is friends racing by a shared code, which two to five covers.
 - **Consequences:** Raising the cap is two constants and a layout check on a phone, not a redesign. The protocol, the Lua join script and the results code all read `MAX_PLAYERS`; the one other place the number lives is the `/5 players` label in `RoomPage.tsx`, which is hard-coded and has to change with it. A sixth player gets the existing `room_full` error, which the client already shows.
+
+## ADR-029: Keystroke logs are kept
+
+- **Date:** 2026-09-28 · **Status:** accepted (settles the open item in ADR-027)
+- **Context:** Every run stores its raw keystroke log, `[t_ms, expected, typed]` per key. The server scores from it, and it is also the most personal thing the app holds: a timing trace of how one person types. ADR-027 corrected a comment that claimed a pruning job existed and left retention as an open decision. The options were to keep logs, to delete them after a fixed window (30 days was built and tested as a command), or never to store them.
+- **Decision:** keep them, for as long as the run itself exists.
+  - **A score can always be checked again.** The point of storing the log is that the server's verdict is reproducible: a run that looks wrong — flagged above 250 WPM, or questioned on a leaderboard — can be replayed from what the player actually sent, whenever the question comes up. A retention window puts an expiry date on that.
+  - **No scheduler is needed.** Deleting on a schedule is either a worker process, which ADR-019 and ADR-027 keep out, or a command someone has to remember to run, which is a policy that holds only as well as someone's memory.
+  - **The log is never exposed.** No endpoint returns it; the API sends back only the numbers computed from it (`test_honest_practice_session_is_stored_and_scored` asserts this).
+- **Consequences:** The README states the policy instead of listing retention as undecided. Storage grows with every run — a few kilobytes of JSON each, which is nothing at this scale and a question for later at a much larger one. Deleting an account's logs on request is not built; if the app ever has users who are not friends, that is the first thing this decision owes them, and it is a `DELETE` or an `UPDATE … SET keystrokes = NULL` away, not a redesign.

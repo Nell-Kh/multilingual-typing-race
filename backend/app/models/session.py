@@ -65,9 +65,8 @@ class TypingSession(Base):
 
     is_valid: Mapped[bool]
     invalid_reason: Mapped[str | None] = mapped_column(String(64))
-    # Raw log [[t_ms, expected, typed], ...]. Kept indefinitely: it is what makes a run
-    # re-verifiable, and there is no scheduler to prune it (ADR-027). Retention is an
-    # open decision, not a solved one.
+    # Raw log [[t_ms, expected, typed], ...]. Kept for as long as the run exists: it is
+    # what makes a run re-verifiable (ADR-029).
     keystrokes: Mapped[list[Any] | None] = mapped_column(JSONB)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
