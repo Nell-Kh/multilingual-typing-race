@@ -19,6 +19,7 @@ from .conftest import AppClientFactory
 pytestmark = pytest.mark.db
 
 AUTH = "/api/v1/auth"
+ROOMS, SESSIONS = "/api/v1/rooms", "/api/v1/sessions"
 NELL = {"email": "nell@example.com", "password": "correct horse battery", "display_name": "Nell"}
 
 
@@ -250,3 +251,72 @@ async def test_a_limited_login_never_reaches_the_password_check(
         assert r.status_code == 429
         # An argon2 verification is tens of milliseconds; a refusal is a Redis GET.
         assert elapsed < 0.05
+
+
+# ---- the write endpoints (ADR-026) -----------------------------------------------------
+
+
+async def _register(client: object, name: str) -> dict[str, str]:
+    r = await client.post(  # type: ignore[attr-defined]
+        f"{AUTH}/register",
+        json={
+            "email": f"{name}@example.com",
+            "password": "correct horse battery",
+            "display_name": name,
+        },
+    )
+    assert r.status_code == 201, r.text
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+async def test_room_creation_is_limited_per_account(
+    app_client_factory: AppClientFactory,
+) -> None:
+    async with app_client_factory(rate_limit_rooms_per_user=2) as client:
+        nell = await _register(client, "nell")
+        body = {"language": "en", "difficulty": 1}
+
+        for _ in range(2):
+            assert (await client.post(ROOMS, json=body, headers=nell)).status_code == 201
+
+        refused = await client.post(ROOMS, json=body, headers=nell)
+
+        assert refused.status_code == 429
+        assert refused.json()["error"]["code"] == "rate_limited"
+
+
+async def test_one_accounts_ceiling_does_not_block_another(
+    app_client_factory: AppClientFactory,
+) -> None:
+    """Counting per account, not per address: two players behind one NAT, or two
+    tabs of the test suite, must not share an allowance."""
+    async with app_client_factory(rate_limit_rooms_per_user=1) as client:
+        nell, sami = await _register(client, "nell"), await _register(client, "sami")
+        body = {"language": "en", "difficulty": 1}
+
+        assert (await client.post(ROOMS, json=body, headers=nell)).status_code == 201
+        assert (await client.post(ROOMS, json=body, headers=nell)).status_code == 429
+
+        assert (await client.post(ROOMS, json=body, headers=sami)).status_code == 201
+
+
+async def test_session_submit_is_limited_per_account(
+    app_client_factory: AppClientFactory,
+) -> None:
+    """Scoring replays the whole keystroke log, so the ceiling is on the account
+    that submits. The run below is rejected as invalid on its merits — what
+    matters here is that the 429 arrives before the work does."""
+    async with app_client_factory(rate_limit_sessions_per_user=1) as client:
+        nell = await _register(client, "nell")
+        body = {
+            "text_id": "00000000-0000-0000-0000-000000000000",
+            "mode": "practice",
+            "started_at": "2026-09-28T10:00:00+00:00",
+            "keystrokes": [[10, "a", "a"]],
+        }
+
+        first = await client.post(SESSIONS, json=body, headers=nell)
+        second = await client.post(SESSIONS, json=body, headers=nell)
+
+        assert first.status_code == 404  # no such text; the limiter still counted it
+        assert second.status_code == 429
