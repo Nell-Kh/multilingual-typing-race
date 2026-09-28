@@ -114,7 +114,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**209 backend tests** (pytest, against a real PostgreSQL and Redis), **72 frontend tests**
+**209 backend tests** (pytest, against a real PostgreSQL and Redis), **75 frontend tests**
 (Vitest + Testing Library) and a **3-case end-to-end smoke test** that boots the stack and
 drives the built frontend with Playwright. All three run in CI on every pull request
 ([e2e/README.md](e2e/README.md)).
@@ -139,6 +139,7 @@ frontend/
   src/features/auth/            auth store and forms
   src/i18n/                     language table (labels, direction)
   src/lib/                      api.ts (typed API client), queries.ts (shared query definitions)
+  src/ui/                       the header, wordmark, button and page-title hook (ADR-032)
 infra/          docker-compose.yml
 docs/           DECISIONS.md (ADRs), rtl-notes.md, race-protocol.md
 .github/        CI workflow (backend + frontend jobs)

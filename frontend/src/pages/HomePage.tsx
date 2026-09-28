@@ -4,8 +4,10 @@ import { useAuth } from "../features/auth/store";
 import { LANGUAGES, loadPracticeLanguage } from "../i18n/languages";
 import { ApiError } from "../lib/api";
 import { dailyQuery } from "../lib/queries";
+import { useTitle } from "../ui/useTitle";
 
 export default function HomePage() {
+  useTitle();
   const user = useAuth((s) => s.user);
   const logout = useAuth((s) => s.logout);
   const language = loadPracticeLanguage();

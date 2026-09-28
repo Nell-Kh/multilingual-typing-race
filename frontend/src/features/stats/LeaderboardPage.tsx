@@ -14,6 +14,7 @@ import {
   type Period,
 } from "../../lib/api";
 import { useAuth } from "../auth/store";
+import { useTitle } from "../../ui/useTitle";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "day", label: "Today" },
@@ -25,6 +26,7 @@ export default function LeaderboardPage() {
   const me = useAuth((s) => s.user);
   const [params] = useSearchParams();
   const isDaily = params.get("daily") === "1";
+  useTitle(isDaily ? "Today's challenge" : "Leaderboard");
   const fromUrl = params.get("lang");
   const [language, setLanguage] = useState<Language>(() =>
     isLanguage(fromUrl) ? fromUrl : loadPracticeLanguage(),
@@ -47,14 +49,6 @@ export default function LeaderboardPage() {
         <h1 className="text-2xl font-bold">
           {isDaily ? "Today's challenge" : "Leaderboard"}
         </h1>
-        <nav className="flex gap-4 text-sm">
-          <Link className="inline-block py-2 underline" to="/stats">
-            Your stats
-          </Link>
-          <Link className="inline-block py-2 underline" to="/">
-            Home
-          </Link>
-        </nav>
       </header>
 
       <div

@@ -150,7 +150,7 @@ describe('signing in as somebody else', () => {
     const user = userEvent.setup()
     expect(await screen.findByTestId('lang-en')).toHaveTextContent('72.5 wpm')
 
-    await user.click(screen.getByRole('link', { name: 'Home' }))
+    await user.click(screen.getByRole('link', { name: 'Keyrace' }))
     await user.click(await screen.findByRole('button', { name: 'Log out' }))
 
     await user.type(await screen.findByLabelText('Email'), 'sami@example.com')

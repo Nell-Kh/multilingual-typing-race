@@ -7,6 +7,7 @@ import { initialState, liveStats, reduce } from '../typing-engine/engine'
 import { TypingBox } from '../typing-engine/TypingBox'
 import { initialRoom, reduceRoom } from './room'
 import { RoomSocket } from './socket'
+import { useTitle } from '../../ui/useTitle'
 
 const PROGRESS_EVERY_MS = 250
 
@@ -19,6 +20,7 @@ const PROGRESS_EVERY_MS = 250
  */
 export default function RoomPage() {
   const { code = '' } = useParams()
+  useTitle(`Room ${code.toUpperCase()}`)
   const navigate = useNavigate()
   const me = useAuth((s) => s.user)
   const [view, dispatch] = useReducer(reduceRoom, undefined, initialRoom)

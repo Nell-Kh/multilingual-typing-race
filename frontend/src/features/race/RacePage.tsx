@@ -1,13 +1,15 @@
 import { useMutation } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { LANGUAGES, LANGUAGE_CODES, loadPracticeLanguage } from '../../i18n/languages'
 import { ApiError, rooms, type Language } from '../../lib/api'
+import { useTitle } from '../../ui/useTitle'
 
 type Difficulty = 1 | 2 | 3
 
 /** Entry point for races: open a room, or join one by its six-letter code. */
 export default function RacePage() {
+  useTitle('Race')
   const navigate = useNavigate()
   const [language, setLanguage] = useState<Language>(loadPracticeLanguage)
   const [difficulty, setDifficulty] = useState<Difficulty>(1)
@@ -28,9 +30,6 @@ export default function RacePage() {
     <main className="flex flex-col gap-8 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Race</h1>
-        <Link className="inline-block py-2 underline text-sm" to="/">
-          Home
-        </Link>
       </header>
 
       <section className="flex flex-col gap-4 rounded-lg border p-6" aria-labelledby="create-heading">

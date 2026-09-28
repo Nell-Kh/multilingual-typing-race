@@ -5,6 +5,7 @@ import { LANGUAGES, LANGUAGE_CODES, loadPracticeLanguage } from '../../i18n/lang
 import { ApiError, stats, type Language, type SessionSummary } from '../../lib/api'
 import { Heatmap } from './Heatmap'
 import { Trend } from './Trend'
+import { useTitle } from '../../ui/useTitle'
 
 /** Time spent typing, at a scale that fits it: a first run is seconds, not "0 min". */
 function duration(ms: number): string {
@@ -19,6 +20,7 @@ function when(iso: string): string {
 }
 
 export default function StatsPage() {
+  useTitle('Your stats')
   const me = useQuery({ queryKey: ['me', 'stats'], queryFn: stats.me })
   // Default to the language with the most runs (a heatmap of a language you have
   // never typed is an empty board); an explicit pick always wins.
@@ -44,14 +46,6 @@ export default function StatsPage() {
     <main className="flex flex-col gap-8 p-4 sm:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your stats</h1>
-        <nav className="flex gap-4 text-sm">
-          <Link className="inline-block py-2 underline" to="/leaderboard">
-            Leaderboard
-          </Link>
-          <Link className="inline-block py-2 underline" to="/">
-            Home
-          </Link>
-        </nav>
       </header>
 
       {me.isPending && <p>Loading…</p>}

@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useReducer, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { useAuth } from "../auth/store";
 import {
   LANGUAGES,
   LANGUAGE_CODES,
@@ -20,14 +19,15 @@ import { isLanguage } from "../../i18n/languages";
 import { initialState, liveStats, reduce } from "../typing-engine/engine";
 import { TypingBox } from "../typing-engine/TypingBox";
 import { ResultsCard } from "./ResultsCard";
+import { useTitle } from "../../ui/useTitle";
 
 type Difficulty = 1 | 2 | 3;
 
 export default function PracticePage() {
-  const user = useAuth((s) => s.user);
   const [params] = useSearchParams();
   // /practice?daily=1&lang=he — today's fixed text, scored on the daily board (ADR-019).
   const isDaily = params.get("daily") === "1";
+  useTitle(isDaily ? "Daily challenge" : "Practice");
   const dailyLang = params.get("lang");
   const [difficulty, setDifficulty] = useState<Difficulty>(1);
   const [language, setLanguage] = useState<Language>(() =>
@@ -108,12 +108,6 @@ export default function PracticePage() {
         <h1 className="text-2xl font-bold">
           {isDaily ? "Daily challenge" : "Practice"}
         </h1>
-        <nav className="flex items-center gap-4 text-sm">
-          <span>{user?.display_name}</span>
-          <Link className="inline-block py-2 underline" to="/">
-            Home
-          </Link>
-        </nav>
       </header>
 
       {isDaily && (
