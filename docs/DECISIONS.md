@@ -168,7 +168,7 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
 
 ## ADR-018: Race architecture
 
-- **Date:** 2026-09-16 · **Status:** accepted · full protocol in `docs/race-protocol.md`
+- **Date:** 2026-09-16 · **Status:** accepted · the "two-replica correctness" sentence in Consequences is superseded by ADR-031 · full protocol in `docs/race-protocol.md`
 - **Context:** M4 is the first milestone where state outlives a request. Rooms need to survive across API replicas, players refresh tabs mid-race, and placement must be as cheat-resistant as practice scoring.
 - **Decision:**
   - **Redis is the room store and the event bus.** Room state lives in Redis hashes with TTLs (rooms clean themselves up); every server→client event is published on a per-room channel and every replica relays to its own sockets. Mutations that must not race (join, finish/place) are Lua scripts. Postgres only receives finished results.
@@ -177,7 +177,7 @@ Format: **Context** (why a decision was needed) → **Decision** → **Consequen
   - **`progress` is advisory, `finish` is the whole keystroke log.** Races reuse `record_session(mode=RACE)` unchanged, plus the existing `server_duration_ms` check. An invalid log keeps its session row and gets no place.
   - **Disconnect keeps the slot during a race**; reconnect gets a full snapshot. Host handoff goes to the earliest-joined connected player.
   - Rooms are join-by-code only, max 5 players, no mid-race joining, no spectators (v1).
-- **Consequences:** The WebSocket handler is thin: parse frame → Lua/Redis → publish. Two-replica correctness is designed in from the start even though Railway runs one replica today. Tests use two in-process WebSocket clients against a real Redis, no browser. The protocol document is the contract the frontend is built against; changing a frame means changing the doc in the same PR.
+- **Consequences:** The WebSocket handler is thin: parse frame → Lua/Redis → publish. ~~Two-replica correctness is designed in from the start even though Railway runs one replica today.~~ *(Superseded by ADR-031: the timed transitions were in-process timers, so this was not true until ADR-031.)* Tests use two in-process WebSocket clients against a real Redis, no browser. The protocol document is the contract the frontend is built against; changing a frame means changing the doc in the same PR.
 
 ## ADR-019: Stats, leaderboards and a daily challenge without a scheduler
 
