@@ -26,9 +26,21 @@ disagree, one of them is wrong — fix it and update the other.
 | State | What players see | Leaves the state when |
 |---|---|---|
 | `lobby` | player list, "waiting for host" | host sends `start` (≥ 1 player connected) |
-| `countdown` | the text (input disabled), 3-2-1 | `starts_at` passes (server timer) |
+| `countdown` | the text (input disabled), 3-2-1 | `starts_at` passes (checked by the server, see below) |
 | `running` | typing box + everyone's progress bars | every connected player finished, or 60 s after the first finish, or 5 min after start |
 | `finished` | results table, "play again" | host sends `play_again` → `lobby`, or the room expires |
+
+**Who moves the room on a clock** (ADR-031). The two timed transitions —
+`countdown → running` at `starts_at`, `running → finished` at the deadline — and
+dropping a player who left the lobby are *lazy*: the deadline is stored in the
+room hash (`starts_at_ms`, `deadline_ms`), and any server call to `tick(code)`
+performs whatever is due, as a Lua compare-and-set so exactly one caller wins.
+`tick` runs on every incoming frame, on every join, on `GET /rooms/{code}`, and
+about once a second in each socket's relay loop. So a room moves on as long as
+anyone is connected to it, on any replica and after a restart; the replica that
+armed an in-process timer only makes the transition land on time instead of up
+to a second late. `start` and `play_again` are compare-and-sets too: two `start`
+frames at once (the host in two tabs) produce one countdown and one text.
 
 Expiry: a room is deleted 10 minutes after its last message in `lobby`/`finished`,
 and 5 minutes after `start` in `running` (nobody types one text for 5 minutes).
@@ -42,6 +54,10 @@ Redis TTLs enforce this; nothing else has to clean up.
   else first, or nothing within 5 seconds, closes the socket with code `4401`.
 - After `auth` the server replies with a full `room` snapshot. Every later change
   is pushed as an event; the client never polls.
+- The token is checked **once**, on `auth`. An open socket outlives the access
+  token's expiry and a logout on another tab. That is acceptable for a room that
+  lives minutes (a race is capped at 5), and the next connection is checked again;
+  it would not be for a long-lived channel.
 - All frames are JSON objects with a `type` field. Unknown types are ignored
   (forward compatibility); malformed JSON closes the socket with `4400`.
 
@@ -60,7 +76,7 @@ Rooms are created over plain HTTP so the client has a code to connect to:
 |---|---|---|
 | `auth` | `{token}` | first frame only |
 | `start` | – | host, in `lobby` |
-| `progress` | `{typed: int, errors: int}` | `running`; at most one per 200 ms (extra ones are dropped, not punished) |
+| `progress` | `{typed: int, errors: int}` | `running`; at most one per 200 ms per socket (extra ones are dropped, not punished; a reconnect starts a fresh interval). The server clamps `typed` to the text length and `errors` to `typed` before relaying |
 | `finish` | `{started_at: iso, keystrokes: [[t, expected, typed], ...]}` | `running`, once per player |
 | `play_again` | – | host, in `finished` |
 | `leave` | – | any state; same as closing the socket |
@@ -108,6 +124,10 @@ never from client timestamps.
 
 ## 6. Disconnects and the host
 
+- **Presence is per connection.** Each socket gets its own connection id, and the
+  player remembers the id of their newest one. The same account in a second tab
+  is the same player on a new connection; when the *old* tab closes, nothing
+  happens. Only the current connection closing marks the player disconnected.
 - Dropping the socket does **not** remove a player during `countdown`/`running`:
   they are marked `connected=false` and keep their slot for the rest of the race.
   Reconnecting (same user, `auth` again) restores them and re-sends `room`, so a
@@ -125,15 +145,21 @@ never from client timestamps.
 Redis holds live state; Postgres holds results.
 
 ```
-room:{code}            HASH  state, host_id, language, difficulty, text_id, starts_at, started_at, created_at
-room:{code}:players    HASH  player_id -> JSON {display_name, joined_at, connected, typed, errors, finished_at, session_id, place}
+room:{code}            HASH  state, host_id, language, difficulty, text_id, text_content, starts_at,
+                             starts_at_ms, started_at, race_id, deadline_ms, places, first_finish_at, created_at
+room:{code}:players    HASH  player_id -> JSON {display_name, joined_at, connected, typed, errors, finished_at,
+                             session_id, place, wpm, accuracy, valid, conn, disconnected_at_ms}
 room:{code}:events     PUB/SUB channel: every server→client event is published here
 ```
 
 Every API replica subscribes to the channel of each room it has sockets for and
 relays. With one replica this is a loop-back; with two it is what makes races
-work at all. Room mutations go through small Lua scripts (join, finish) so two
-replicas cannot both admit a sixth player or assign the same place twice.
+work at all. Every mutation that could race goes through a Lua script — join,
+start, the two timed transitions, play again, disconnect, the lobby sweep, host
+handoff, and any write to one player's JSON (merged field by field, never
+rewritten whole) — so two replicas cannot admit a sixth player, start a race
+twice, end it twice, or undo each other's writes. Places come from `HINCRBY`.
+`conn` and `disconnected_at_ms` are bookkeeping and are never sent to clients.
 
 Postgres (migration `0003`):
 
@@ -158,5 +184,9 @@ Backend, no browser: two `httpx`/`starlette` WebSocket test clients in one room.
 Cases: auth required; host-only start; countdown → started ordering; progress
 relay; finish order gives places; invalid log gets no place; disconnect during
 race keeps the slot and reconnect gets a snapshot; host leaves in lobby → handoff;
-room expires. Frontend: the lobby and race screens are tested against a fake
+room expires; two `start`s at once make one countdown; closing an old tab leaves
+the new one connected; `progress` is clamped; a race starts and ends with every
+in-process timer disabled. Service-level tests (`test_room_state.py`) drive a
+second `RoomService` instance through a room it never armed a timer for, and
+five concurrent ticks through one transition. Frontend: the lobby and race screens are tested against a fake
 socket that replays the frames above.

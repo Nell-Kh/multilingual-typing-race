@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     room_idle_ttl_seconds: int = 600  # lobby / finished rooms expire after this much silence
     lobby_disconnect_grace_seconds: float = 10.0  # a refresh in the lobby is not a leave
     ws_auth_timeout_seconds: float = 5.0
+    # How often each socket's relay loop checks its room for an overdue transition
+    # (ADR-031). The upper bound on how late a race can start or end if this
+    # replica did not arm the timer for it.
+    room_tick_seconds: float = 1.0
 
     @field_validator("database_url")
     @classmethod

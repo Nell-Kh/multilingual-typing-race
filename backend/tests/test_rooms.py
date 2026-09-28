@@ -31,6 +31,7 @@ COUNTDOWN_S = 0.2
 FINISH_GRACE_S = 2.5  # longer than one simulated typing run (~1.3 s), shorter than patience
 LOBBY_GRACE_S = 1.0
 MIN_GAP_MS = 30  # the fastest median the validator accepts
+TICK_S = 0.1  # how often each socket's relay checks for an overdue transition
 
 
 async def _wipe(database_url: str, redis_url: str) -> None:
@@ -67,6 +68,7 @@ def client(database: str, redis_available: str) -> Iterator[TestClient]:
         race_max_seconds=10,
         lobby_disconnect_grace_seconds=LOBBY_GRACE_S,
         ws_auth_timeout_seconds=1,
+        room_tick_seconds=TICK_S,
     )
     with TestClient(create_app(settings)) as c:
         yield c
@@ -488,3 +490,95 @@ def test_empty_room_disappears(client: TestClient) -> None:
     time.sleep(0.2)
 
     assert client.get(f"{ROOMS}/{code}").status_code == 404
+
+
+# ---- concurrency, restarts and two tabs (ADR-031) ---------------------------------
+
+
+def _frames_until(ws: WebSocketTestSession, kind: str) -> list[dict[str, Any]]:
+    """Every frame up to and including the first of `kind`."""
+    seen = []
+    for _ in range(50):
+        frame = receive(ws)
+        seen.append(frame)
+        if frame["type"] == kind:
+            return seen
+    raise AssertionError(f"no {kind} frame")
+
+
+def test_two_start_frames_at_once_make_one_countdown(client: TestClient) -> None:
+    # The host in two tabs presses start in both. Each tab's frame is handled by its
+    # own socket task, so the two `start`s really do run side by side on the server.
+    host, _ = register(client, "host")
+    guest, _ = register(client, "guest")
+    code = create_room(client, host)
+    tab1, _ = connect(client, code, host)
+    tab2, _ = connect(client, code, host)
+    watcher, _ = connect(client, code, guest)
+
+    tab1.send_json({"type": "start"})
+    tab2.send_json({"type": "start"})
+
+    frames = _frames_until(watcher, "started")
+    countdowns = [f for f in frames if f["type"] == "countdown"]
+    assert len(countdowns) == 1, countdowns
+    # The text everyone was shown is the text the server will score against.
+    snap = client.get(f"{ROOMS}/{code}").json()
+    assert snap["state"] == "running"
+    for ws in (tab1, tab2, watcher):
+        close(ws)
+
+
+def test_closing_an_old_tab_does_not_disconnect_the_new_one(client: TestClient) -> None:
+    host, host_id = register(client, "host")
+    guest, _ = register(client, "guest")
+    code = create_room(client, host)
+    old_tab, _ = connect(client, code, host)
+    watcher, _ = connect(client, code, guest)
+    new_tab, _ = connect(client, code, host)  # same account, second tab
+
+    close(old_tab)
+    time.sleep(LOBBY_GRACE_S + 0.5)  # past the point where a real leave is swept
+
+    players = {p["id"]: p for p in client.get(f"{ROOMS}/{code}").json()["players"]}
+    assert host_id in players, "the host was removed while their new tab was open"
+    assert players[host_id]["connected"] is True
+    # Closing the tab that is actually current still counts as leaving.
+    close(new_tab)
+    until(watcher, "player_connection", player_id=host_id, connected=False)
+    close(watcher)
+
+
+def test_progress_is_clamped_to_the_text(client: TestClient) -> None:
+    race = run_race_to_start(client)
+    ws1, ws2 = race["sockets"]
+    (_, id1), _ = race["tokens"]
+
+    ws1.send_json({"type": "progress", "typed": 100_000, "errors": 999_999})
+
+    frame = until(ws2, "progress", player_id=id1)
+    assert frame["typed"] == len(race["text"])
+    assert frame["errors"] == frame["typed"]
+    close(ws1)
+    close(ws2)
+
+
+def test_a_race_starts_and_ends_with_no_timers_at_all(client: TestClient, database: str) -> None:
+    # What a restart looks like to a room: the timers that were armed are gone. Turn
+    # scheduling off entirely, so every transition has to come from a tick.
+    rooms = client.app.state.rooms  # type: ignore[attr-defined]
+    rooms._schedule = lambda coro: coro.close()  # noqa: SLF001 - simulating their loss
+
+    race = run_race_to_start(client)  # countdown -> running with no timer
+    ws1, ws2 = race["sockets"]
+    (_, id1), (_, id2) = race["tokens"]
+    finish(ws1, race)
+    until(ws1, "player_finished", player_id=id1)
+
+    over = until(ws2, "race_over")  # running -> finished at the grace deadline, no timer
+    by_id = {r["player_id"]: r for r in over["results"]}
+    assert by_id[id1]["place"] == 1 and by_id[id2]["dnf"] is True
+    races, results, _ = asyncio.run(_db_counts(database))
+    assert (races, results) == (1, 2)
+    close(ws1)
+    close(ws2)
