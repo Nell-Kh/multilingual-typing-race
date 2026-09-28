@@ -85,7 +85,7 @@ Rooms are created over plain HTTP so the client has a code to connect to:
 
 | type | payload | sent |
 |---|---|---|
-| `room` | full snapshot: `{code, state, language, difficulty, host_id, text?, starts_at?, players: [{id, display_name, connected, typed, errors, finished_at?, result?}]}` | after `auth`, and after every reconnect |
+| `room` | full snapshot: `{code, state, language, difficulty, max_players, host_id, text?, starts_at?, players: [{id, display_name, connected, typed, errors, finished_at?, result?}]}` | after `auth`, and after every reconnect |
 | `player_joined` / `player_left` | `{player}` / `{player_id}` | lobby changes |
 | `player_connection` | `{player_id, connected}` | a socket drops or comes back mid-race |
 | `host_changed` | `{host_id}` | host handoff (§6) |

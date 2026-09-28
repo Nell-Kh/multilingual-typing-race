@@ -24,6 +24,7 @@ const SNAPSHOT: ServerFrame = {
   host_id: 'a',
   language: 'he',
   difficulty: 2,
+  max_players: 5,
   text: null,
   starts_at: null,
   started_at: null,
@@ -42,6 +43,7 @@ describe('room reducer', () => {
     expect(v.hostId).toBe('a')
     expect(v.language).toBe('he')
     expect(v.players.map((p) => p.id)).toEqual(['a'])
+    expect(v.maxPlayers).toBe(5) // from the server, not a constant in the page
   })
 
   it('adds joiners once, even when our own join is echoed back', () => {

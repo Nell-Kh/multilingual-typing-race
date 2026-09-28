@@ -153,7 +153,11 @@ export default function RoomPage() {
       </header>
 
       <p className="text-sm text-gray-500">
-        {LANGUAGES[view.language].label} · difficulty {view.difficulty} · {view.players.length}/5 players
+        {LANGUAGES[view.language].label} · difficulty {view.difficulty} ·{' '}
+        <span data-testid="seats">
+          {view.players.length}
+          {view.maxPlayers === null ? '' : `/${view.maxPlayers}`} players
+        </span>
       </p>
 
       {view.error && (

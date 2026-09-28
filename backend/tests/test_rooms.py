@@ -247,6 +247,7 @@ def test_create_and_preview_room(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["state"] == "lobby" and body["host_id"] == user_id and body["players"] == []
+    assert body["max_players"] == MAX_PLAYERS  # the client's "n / max" comes from here
 
     assert client.get(f"{ROOMS}/NOPE22").status_code == 404
     assert client.post(ROOMS, json={"language": "he", "difficulty": 1}).status_code == 401

@@ -61,7 +61,7 @@ beforeEach(() => {
       if (url.includes('/auth/refresh')) return json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 })
       if (url.includes('/auth/me')) return json(ME)
       if (url.endsWith('/rooms') && init?.method === 'POST')
-        return json({ code: 'NEW123', state: 'lobby', host_id: 'me', language: 'en', difficulty: 1, players: [] }, 201)
+        return json({ code: 'NEW123', state: 'lobby', host_id: 'me', language: 'en', difficulty: 1, max_players: 5, players: [] }, 201)
       throw new Error(`unexpected ${url}`)
     }),
   )
@@ -81,7 +81,7 @@ async function openRoom(code = 'ABC123', hostId = 'me') {
   expect(ws.sent[0]).toEqual({ type: 'auth', token: 'tok' })
   ws.push({
     type: 'room', code, state: 'lobby', host_id: hostId, language: 'en', difficulty: 1,
-    text: null, starts_at: null, started_at: null, players: [SELF, OTHER],
+    max_players: 4, text: null, starts_at: null, started_at: null, players: [SELF, OTHER],
   })
   return ws
 }
@@ -116,6 +116,8 @@ describe('room page', () => {
 
     expect(await screen.findByText('Sami')).toBeInTheDocument()
     expect(screen.getByText('(host)')).toBeInTheDocument()
+    // The cap comes from the server's snapshot (4 here), not a number in the page.
+    expect(screen.getByTestId('seats')).toHaveTextContent('2/4 players')
     await user.click(screen.getByRole('button', { name: 'Start race' }))
 
     expect(ws.sent.at(-1)).toEqual({ type: 'start' })

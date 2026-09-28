@@ -31,6 +31,7 @@ class RoomOut(BaseModel):
     host_id: str
     language: Language
     difficulty: int
+    max_players: int
     players: list[PlayerOut]
 
     @classmethod
@@ -41,5 +42,6 @@ class RoomOut(BaseModel):
             host_id=snapshot["host_id"],
             language=snapshot["language"],
             difficulty=snapshot["difficulty"],
+            max_players=snapshot["max_players"],
             players=[PlayerOut(**p) for p in snapshot["players"]],
         )
