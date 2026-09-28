@@ -8,7 +8,7 @@
 // `Text`). Anything used by more than one component belongs here.
 
 import { queryOptions } from '@tanstack/react-query'
-import { daily, type Daily, type Language, type Text } from './api'
+import { daily, leaderboards, stats, type Daily, type Language, type Text } from './api'
 
 /**
  * Today's challenge for one language, cached exactly as the server sends it.
@@ -28,3 +28,20 @@ export function dailyQuery(language: Language) {
 
 /** Consumers that only want the text select it out; the cache still holds `Daily`. */
 export const selectDailyText = (d: Daily): Text => d.text
+
+/** The signed-in user's per-language stats: the stats page and the home page's best row. */
+export function myStatsQuery() {
+  return queryOptions({ queryKey: ['me', 'stats'] as const, queryFn: stats.me })
+}
+
+/**
+ * Today's board for one language. `me` is the signed-in player's best counted run
+ * today, which is what "already done today" means on the home page.
+ */
+export function dailyBoardQuery(language: Language) {
+  return queryOptions({
+    queryKey: ['daily', 'board', language] as const,
+    queryFn: () => leaderboards.daily(language),
+    retry: false,
+  })
+}

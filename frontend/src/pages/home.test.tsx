@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
@@ -71,5 +71,75 @@ describe('home page daily card', () => {
     render(<App />)
 
     expect(await screen.findByTestId('daily-error')).toHaveTextContent('No daily challenge in this language yet.')
+  })
+})
+
+describe('home page entries', () => {
+  function serveHome(extra: (u: string) => Response | undefined) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL | Request) => {
+        const u = String(url)
+        const hit = extra(u)
+        if (hit) return Promise.resolve(hit)
+        if (u.includes('/auth/refresh')) return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
+        if (u.includes('/auth/me')) return Promise.resolve(json(USER))
+        if (u.includes('/daily?lang=')) return Promise.resolve(json(DAILY))
+        return Promise.resolve(json(PROBLEM, 404))
+      }),
+    )
+  }
+
+  it('offers Practice, Race and Daily, and tells a new player where to start', async () => {
+    serveHome((u) => (u.includes('/me/stats') ? json({ languages: [], trend: [] }) : undefined))
+    render(<App />)
+
+    for (const name of ['Practice', 'Race', 'Daily']) {
+      expect(await screen.findByRole('region', { name })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('link', { name: 'Start practice' })).toHaveAttribute('href', '/practice')
+    expect(screen.getByRole('button', { name: 'Create a room' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Join' })).toBeDisabled() // until a 6-letter code
+    expect(await screen.findByTestId('daily-card')).toHaveTextContent('snow on the gate')
+    expect(screen.getByTestId('tagline')).toHaveTextContent('Type in English · עברית · العربية')
+    await waitFor(() =>
+      expect(screen.getByTestId('best-row')).toHaveTextContent('No runs yet — start with Practice.'),
+    )
+  })
+
+  it('shows your best per language, and a daily already done today', async () => {
+    serveHome((u) => {
+      if (u.includes('/me/stats'))
+        return json({
+          languages: [{ language: 'he', runs: 3, best_wpm: 61.2, avg_wpm: 55, avg_accuracy: 97, total_time_ms: 90000 }],
+          trend: [],
+        })
+      if (u.includes('/daily/leaderboard'))
+        return json({ language: 'en', period: 'day', rows: [], me: { rank: 2, user_id: 'u1', display_name: 'Nell', wpm: 58, accuracy: 99, started_at: '' } })
+      return undefined
+    })
+    render(<App />)
+
+    expect(await screen.findByTestId('best-row')).toHaveTextContent('עברית 61.2 wpm')
+    expect(screen.getByRole('link', { name: 'All your stats' })).toHaveAttribute('href', '/stats')
+    expect(await screen.findByTestId('daily-done')).toHaveTextContent('Done today #2 with 58 wpm')
+    expect(screen.getByRole('link', { name: 'Try it again' })).toHaveAttribute('href', '/practice?daily=1&lang=en')
+  })
+
+  it('the language picker changes the daily text and is remembered for practice', async () => {
+    serveHome((u) =>
+      u.includes('/daily?lang=he')
+        ? json({ ...DAILY, language: 'he', text: { ...TEXT, language: 'he', content: 'שלג על השער' } })
+        : undefined,
+    )
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByTestId('daily-card')
+
+    await user.click(within(screen.getByRole('group', { name: 'Language' })).getByRole('button', { name: 'עברית' }))
+
+    expect(await screen.findByTestId('daily-preview')).toHaveTextContent('שלג על השער')
+    expect(screen.getByTestId('daily-preview')).toHaveAttribute('dir', 'rtl')
+    expect(screen.getByRole('link', { name: "Type today's text" })).toHaveAttribute('href', '/practice?daily=1&lang=he')
   })
 })
