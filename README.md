@@ -8,7 +8,7 @@ Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew an
 
 **Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
-> Status: **M5 complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
+> Status: **M5 complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
 
 ## How scoring works
 
@@ -114,7 +114,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**195 backend tests** (pytest, against a real PostgreSQL and Redis), **72 frontend tests**
+**198 backend tests** (pytest, against a real PostgreSQL and Redis), **72 frontend tests**
 (Vitest + Testing Library) and a **3-case end-to-end smoke test** that boots the stack and
 drives the built frontend with Playwright. All three run in CI on every pull request
 ([e2e/README.md](e2e/README.md)).
