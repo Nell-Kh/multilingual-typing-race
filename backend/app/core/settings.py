@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     rate_limit_login_per_ip: int = 40
     rate_limit_login_failures_per_email: int = 10
     rate_limit_refresh_per_ip: int = 120
+    # Writes, counted per account rather than per address: these need a token,
+    # so the account is the thing worth limiting (ADR-026).
+    rate_limit_sessions_per_user: int = 60
+    rate_limit_rooms_per_user: int = 20
 
     # Race timing (docs/race-protocol.md §2, §5, §6). Tests shrink these to milliseconds.
     race_countdown_seconds: float = 3.0

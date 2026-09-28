@@ -3,13 +3,18 @@ import uuid
 from fastapi import APIRouter, status
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import CurrentUser, SessionDep
+from app.core.deps import CurrentUser, RateLimiterDep, SessionDep, SettingsDep
 from app.core.errors import ApiError
+from app.core.limits import enforce
 from app.models import SessionMode, TypingSession
 from app.schemas.session import KeyStatOut, SessionResult, SessionSubmit
 from app.services import sessions, stats, texts
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
+
+# Scoring a run costs a replay of the whole keystroke log, so the ceiling is
+# per account rather than per address (ADR-026).
+BUCKET_SUBMIT = "sessions:submit:user"
 
 
 def _result(row: TypingSession) -> SessionResult:
@@ -29,8 +34,15 @@ def _result(row: TypingSession) -> SessionResult:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def submit_session(
-    body: SessionSubmit, user: CurrentUser, session: SessionDep
+    body: SessionSubmit,
+    user: CurrentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
 ) -> SessionResult:
+    await enforce(
+        limiter, settings, BUCKET_SUBMIT, str(user.id), settings.rate_limit_sessions_per_user
+    )
     text = await texts.get_text(session, body.text_id)
     if text is None or not text.is_active:
         raise ApiError(404, "not_found", "Text not found")

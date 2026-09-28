@@ -16,8 +16,9 @@ from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect, status
 from pydantic import BaseModel, Field, ValidationError
 from redis.asyncio.client import PubSub
 
-from app.core.deps import CurrentUser
+from app.core.deps import CurrentUser, RateLimiterDep, SettingsDep
 from app.core.errors import ApiError
+from app.core.limits import enforce
 from app.core.security import InvalidTokenError, TokenType, decode_token
 from app.models import User
 from app.schemas.room import RoomCreate, RoomOut
@@ -27,6 +28,10 @@ from app.services.rooms import PROGRESS_MIN_INTERVAL, RoomError, RoomService
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/rooms", tags=["rooms"])
+
+# A room is a Redis key with a TTL and a pub/sub channel; opening them in a
+# loop is cheap for the caller and not for us (ADR-026).
+BUCKET_CREATE = "rooms:create:user"
 
 # WebSocket close codes (4xxx is the application range).
 WS_UNAUTHORIZED = 4401
@@ -40,7 +45,16 @@ def get_rooms(request: Request) -> RoomService:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_room(body: RoomCreate, user: CurrentUser, request: Request) -> RoomOut:
+async def create_room(
+    body: RoomCreate,
+    user: CurrentUser,
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+) -> RoomOut:
+    await enforce(
+        limiter, settings, BUCKET_CREATE, str(user.id), settings.rate_limit_rooms_per_user
+    )
     rooms = get_rooms(request)
     room = await rooms.create_room(user, language=body.language, difficulty=body.difficulty)
     return RoomOut.from_snapshot(room.snapshot())

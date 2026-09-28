@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 
 from app.api import health, v1
 from app.core.errors import install_error_handlers
+from app.core.headers import install_security_headers
 from app.core.settings import Settings, get_settings
 from app.db.session import create_engine, create_session_factory
 from app.services.rooms import RoomService
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    install_security_headers(app, hsts=settings.app_env == "prod")
     install_error_handlers(app)
     app.include_router(health.router)
     app.include_router(v1.router)

@@ -130,8 +130,15 @@ def app_client_factory(database: str, redis_available: str) -> AppClientFactory:
         from app.core.settings import Settings
         from app.main import create_app, lifespan
 
+        # Overrides win, so a test can ask for app_env="prod" as easily as a
+        # shorter rate-limit window.
         settings = Settings(
-            app_env="test", database_url=database, redis_url=redis_available, **overrides
+            **{
+                "app_env": "test",
+                "database_url": database,
+                "redis_url": redis_available,
+                **overrides,
+            }
         )
         app = create_app(settings)
         async with lifespan(app):
