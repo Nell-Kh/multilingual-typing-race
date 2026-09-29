@@ -1,4 +1,10 @@
-# Multilingual Typing Race
+# Keyrace
+
+**Type in English · עברית · العربية**
+
+The repository is named `multilingual-typing-race`; Keyrace is the product.
+
+**Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
 
 A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice alone or race friends in real time, track WPM / accuracy / weak keys over time, leaderboards per language, daily challenge.
 
@@ -6,9 +12,7 @@ Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew an
 
 **The server is the judge.** The browser never sends a score. It sends the raw keystroke log — `[t_ms, expected, typed]` per key — and the server replays it, recomputes every number, and decides whether the run counts at all. A client that lies has to lie in a log that replays to the target text at a human rhythm.
 
-**Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
-
-> Status: **functionally complete (v1.0).** Next: visual pass. Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
+> Status: **v1.0 — complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards; light and dark mode, and every page fits a 360px phone. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
 
 ## How scoring works
 
@@ -29,17 +33,21 @@ What you see is what you type: every text is normalized once at import (niqqud a
 
 ## What it looks like
 
-A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 75 ms and 105 ms per key — which is why the speeds (144.62 and 107.46 WPM) are faster than most people type. Everything else is the real stack: the server's countdown, the relay, the validator and the numbers it computed. A steady 75 ms rhythm is inside the human range, so the validator accepts it; it is built to reject pasted text and machine-speed input, not a script that types at a human pace (see [How scoring works](#how-scoring-works)).
+A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 150 ms and 205 ms per key, which the server scored at 76.52 and 56.95 WPM. Everything else is the real stack: the server's countdown, the relay, the validator, and the places, speeds and times it computed — the same table on both players' screens. A steady rhythm at a human pace is inside what the validator accepts; it is built to reject pasted text and machine-speed input, not a script that types like a person (see [How scoring works](#how-scoring-works)).
 
-![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars advancing as the text turns green right to left, and the server's results with places and WPM](docs/img/race-hebrew.gif)
+![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars filling from the right as the text turns green right to left, and the server's results with places, WPM and times](docs/img/race-hebrew.gif)
 
-Practising in Arabic, mid-run (typed by the same kind of script, with deliberate mistakes). Green is behind the caret, the pink cell is a character typed wrong — and the letters stay joined across it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). Speed, accuracy and errors update as you type; the numbers that count are the server's.
+Practising in Arabic, mid-run (typed by the same kind of script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ل of الجسر — and it stays joined to the ج after it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). A wrong letter is marked by background as well as colour, so it does not depend on telling red from green (ADR-032). Speed, accuracy and errors update as you type; the numbers that count are the server's.
 
-![The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter, and live WPM, accuracy and error counts underneath](docs/img/practice-arabic.png)
+![The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter still joined to its neighbour, and live speed, accuracy, errors and time underneath](docs/img/practice-arabic.png)
 
-The stats page, filled by scripted practice runs: best and average per language, the last runs as a trend, and the keys you miss on the layout you actually type on — here Arabic 101. A key with no data is dashed rather than coloured, so "never typed" cannot be read as "never missed".
+The stats page, filled by scripted practice runs: best and average per language, every recent run with its 7-run moving average, and the keys you miss on the layout you actually type on — here Arabic 101. A key typed fewer than 10 times is dashed rather than coloured, so "barely typed" cannot be read as "never missed" (ADR-025).
 
-![The stats page: per-language cards, a WPM trend line, and an Arabic keyboard heatmap where missed keys are shaded red](docs/img/stats-heatmap.png)
+![The stats page: per-language cards, a speed chart with each run and the 7-run average, and an Arabic keyboard heatmap where missed keys are shaded red](docs/img/stats-heatmap.png)
+
+On a phone, right to left: Hebrew practice at 390px, one wrong letter on screen. The text, the caret and the error mark follow the text's direction; the page around it stays put.
+
+<img src="docs/img/phone-hebrew.png" alt="The practice page on a 390px phone in Hebrew: the sentence typed from the right, green behind the caret, one wrong letter marked, and the live numbers below" width="300">
 
 ## Accounts
 
@@ -140,17 +148,17 @@ frontend/
   src/i18n/                     language table (labels, direction)
   src/lib/                      api.ts (typed API client), queries.ts (shared query definitions)
   src/ui/                       shared pieces: header, wordmark, button, segmented toggle, stat strip (ADR-032)
+e2e/            Playwright: the smoke journey and a two-browser race, against the built frontend
 infra/          docker-compose.yml
-docs/           DECISIONS.md (ADRs), rtl-notes.md, race-protocol.md
-.github/        CI workflow (backend + frontend jobs)
+docs/           DECISIONS.md (ADRs), rtl-notes.md, race-protocol.md, img/ (the pictures above)
+.github/        CI workflow (backend, frontend and e2e jobs)
 ```
 
 ## Planned
 
-Not built yet. Everything above this section describes what is in the repo today.
+Not built. Everything above this section describes what is in the repo today.
 
-- **M6 — the visual pass.** The current interface is deliberately plain: correct behaviour, default styling. M6 is the design of every page, dark mode included.
-- **Interface translations.** Hebrew and Arabic labels with a mirrored layout, deferred to M6 so the strings are translated once against the final UI (ADR-017). The text language and the interface language stay independent: a Hebrew speaker can practise English typing in a Hebrew interface.
+- **Interface translations.** Hebrew and Arabic labels with a mirrored layout. ADR-017 deferred them until the interface was final; v1.0 ships with that interface in English only. The text language and the interface language stay independent: a Hebrew speaker could practise English typing in a Hebrew interface.
 - **Everything else that was considered and deliberately left out** — a background worker, OAuth, race replay, lenient Arabic matching, materialized views — is listed with its reasoning in ADR-027.
 
 ## Docs
