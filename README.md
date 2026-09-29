@@ -10,7 +10,7 @@
 
 ![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars filling from the right as the text turns green right to left, and the server's results with places, WPM and times](docs/img/race-hebrew.gif)
 
-<sub>A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 150 ms and 205 ms per key, which the server scored at 76.52 and 56.95 WPM. Everything else is the real stack: the server's countdown, the relay, the validator, and the places, speeds and times it computed — the same table on both players' screens. A steady rhythm at a human pace is inside what the validator accepts; it is built to reject pasted text and machine-speed input, not a script that types like a person (see [How scoring works](#how-scoring-works)).</sub>
+<sub>Recorded from the host's screen. The typing is scripted by Playwright at a human pace (150 ms and 205 ms per key); the countdown, relay, validation and results are the real stack.</sub>
 
 ## What it is
 
