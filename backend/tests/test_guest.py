@@ -26,9 +26,11 @@ async def engine(database: str) -> AsyncIterator[AsyncEngine]:
 
 async def _rows(engine: AsyncEngine) -> tuple[int, int]:
     async with engine.connect() as conn:
-        sessions = (await conn.execute(sql("SELECT count(*) FROM typing_sessions"))).scalar_one()
-        keys = (await conn.execute(sql("SELECT count(*) FROM session_key_stats"))).scalar_one()
-    return int(sessions), int(keys)
+        sessions: int = (
+            await conn.execute(sql("SELECT count(*) FROM typing_sessions"))
+        ).scalar_one()
+        keys: int = (await conn.execute(sql("SELECT count(*) FROM session_key_stats"))).scalar_one()
+    return sessions, keys
 
 
 async def _a_text(client: AsyncClient, database: str) -> dict[str, object]:
