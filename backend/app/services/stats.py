@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import Cursor
 from app.models import Language, SessionKeyStat, SessionMode, Text, TypingSession, User
+from app.services.typing_metrics import BACKSPACE
 
 Period = Literal["day", "week", "all"]
 # How a tie is numbered: "standard" leaves a gap after it (1, 2, 2, 4),
@@ -304,3 +305,64 @@ async def daily_text(session: AsyncSession, language: Language, day: date) -> Te
 def today(now: datetime | None = None) -> date:
     """The date the daily challenge belongs to: the calendar date in APP_TZ."""
     return (now or datetime.now(UTC)).astimezone(APP_TZ).date()
+
+
+# ---- the daily ghost (ADR-035) ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Ghost:
+    """Today's #1 on the daily board, as much of their run as a ghost bar needs."""
+
+    display_name: str
+    wpm: float
+    offsets_ms: list[int]
+
+
+def progress_offsets(keystrokes: Sequence[Sequence[object]]) -> list[int]:
+    """For each character of the finished text, when it was typed for the last time,
+    in ms from the run's first key. Replaying the log is enough: a character is
+    appended, a backspace takes the last one away, and what is left is the text
+    (the validator checked that), so the times left are one per character and in
+    order. Wrong keys and corrections cancel out; no character leaves this function."""
+    if not keystrokes:
+        return []
+    t0 = int(str(keystrokes[0][0]))
+    times: list[int] = []
+    for t, _expected, typed in keystrokes:
+        if typed == BACKSPACE:
+            if times:
+                times.pop()
+        else:
+            times.append(int(str(t)) - t0)
+    return times
+
+
+async def daily_ghost(
+    session: AsyncSession, *, language: Language, text_id: uuid.UUID, now: datetime | None = None
+) -> Ghost | None:
+    """The run in first place on today's daily board: the fastest valid daily run on
+    today's text, earliest on ties, which is exactly the board's row #1."""
+    since = period_start("day", now)
+    conditions = [
+        TypingSession.language == language,
+        TypingSession.is_valid.is_(True),
+        TypingSession.mode == SessionMode.DAILY,
+        TypingSession.text_id == text_id,
+    ]
+    if since is not None:
+        conditions.append(TypingSession.started_at >= since)
+    row = (
+        await session.execute(
+            select(TypingSession.keystrokes, TypingSession.wpm, User.display_name)
+            .join(User, User.id == TypingSession.user_id)
+            .where(*conditions)
+            .order_by(TypingSession.wpm.desc(), TypingSession.started_at.asc())
+            .limit(1)
+        )
+    ).first()
+    if row is None or not row.keystrokes:
+        return None
+    return Ghost(
+        display_name=row.display_name, wpm=row.wpm, offsets_ms=progress_offsets(row.keystrokes)
+    )

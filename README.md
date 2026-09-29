@@ -20,6 +20,7 @@ A real-time typing trainer and race for Hebrew, Arabic and English. The browser 
 
 - **Practice** in any of the three languages at three difficulties — with an account, or as a guest whose runs are scored the same way and not saved.
 - **Real-time races** of up to 5 players, joined by a room code: server countdown, live progress bars, places decided by the server.
+- **Racing alone**: a pacer at 40, 60 or 80 WPM on any practice text, and on the daily, a ghost of today's #1 replayed from their key timings.
 - **Daily challenge**: one text per language, the same for everyone, new at midnight Israel time, with its own board.
 - **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss on your own keyboard layout.
 - **Leaderboards** per language — all-time, weekly and daily — with tied speeds sharing a rank and your own row pinned when you are outside the top.
@@ -30,12 +31,12 @@ Status: **v1.0 — complete.**
 
 ## Engineering highlights
 
-- **215 backend tests** (pytest against a real PostgreSQL and Redis) and **117 frontend tests** (Vitest + Testing Library).
+- **220 backend tests** (pytest against a real PostgreSQL and Redis) and **124 frontend tests** (Vitest + Testing Library).
 - **5 end-to-end tests in 3 Playwright specs**, run in CI against the built frontend and a real API — including a whole race between two browsers, and a visitor trying it without an account.
 - **The server is the judge**: seven validation rules on every log (empty, too few keystrokes, replay does not reproduce the text, time running backwards, median gap under 30 ms, 10+ keys at machine speed, and in a race a duration that disagrees with the server's clock by over 1.5 s), plus a review flag above 250 WPM.
 - **Race state that survives restarts, double starts and second tabs**: rooms live in Redis, every transition is a Lua compare-and-set, and timed transitions are applied by whichever server next looks at the room ([ADR-031](docs/DECISIONS.md)).
 - **Hebrew and Arabic by design**: import-time normalization of niqqud, tashkeel and typographic punctuation; one span per character with the browser keeping Arabic joined ([docs/rtl-notes.md](docs/rtl-notes.md)).
-- **34 architecture decision records**, each with its context, decision and cost: [docs/DECISIONS.md](docs/DECISIONS.md).
+- **35 architecture decision records**, each with its context, decision and cost: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Screenshots
 
@@ -156,7 +157,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**215 backend tests** (pytest, against a real PostgreSQL and Redis), **117 frontend tests**
+**220 backend tests** (pytest, against a real PostgreSQL and Redis), **124 frontend tests**
 (Vitest + Testing Library) and **5 end-to-end tests** that boot the stack and drive the
 built frontend with Playwright, one a whole race between two browsers and one a visitor trying it without an account. All three
 suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).

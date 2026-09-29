@@ -9,6 +9,7 @@ import {
 } from "../../i18n/languages";
 import {
   ApiError,
+  daily,
   leaderboards,
   sessions,
   texts,
@@ -20,12 +21,16 @@ import { isLanguage } from "../../i18n/languages";
 import { initialState, liveStats, reduce } from "../typing-engine/engine";
 import { TypingBox } from "../typing-engine/TypingBox";
 import { ResultsCard } from "./ResultsCard";
+import { PaceRows, type Runner } from "./PaceRows";
+import { correctPrefix, ghostChars, pacerChars } from "./pace";
+import { useAuth } from "../auth/store";
 import { Button } from "../../ui/Button";
 import { Segmented } from "../../ui/Segmented";
 import { StatStrip } from "../../ui/StatStrip";
 import { useTitle } from "../../ui/useTitle";
 
 type Difficulty = 1 | 2 | 3;
+type Pacer = 0 | 40 | 60 | 80;
 
 export default function PracticePage({ guest = false }: { guest?: boolean }) {
   const [params] = useSearchParams();
@@ -39,6 +44,11 @@ export default function PracticePage({ guest = false }: { guest?: boolean }) {
     isDaily && isLanguage(dailyLang) ? dailyLang : loadPracticeLanguage(),
   );
   const [attempt, setAttempt] = useState(0); // bump to fetch a new text
+  // Someone to type against when nobody else is here (ADR-035): a steady pacer on free
+  // practice, today's #1 as a ghost on the daily. Both are drawn in the browser only.
+  const [pacer, setPacer] = useState<Pacer>(0);
+  const [ghostOn, setGhostOn] = useState(false);
+  const me = useAuth((s) => s.user);
 
   // Two queries, one of them switched off: the daily challenge and a random text are
   // different resources with different cache keys, and the daily one is defined once
@@ -94,6 +104,32 @@ export default function PracticePage({ guest = false }: { guest?: boolean }) {
     return () => clearInterval(id);
   }, [engine.startedAt, engine.finished]);
   const stats = liveStats(engine, now);
+
+  const ghost = useQuery({
+    queryKey: ["daily", "ghost", language],
+    queryFn: () => daily.ghost(language),
+    enabled: isDaily,
+    retry: false,
+  });
+  const total = Array.from(text.data?.content ?? "").length;
+  const you: Runner = {
+    id: "you",
+    name: me?.display_name ?? "You",
+    note: "you",
+    typed: correctPrefix(engine.typed, engine.target),
+    highlight: true,
+  };
+  const opponent: Runner | null =
+    isDaily && ghostOn && ghost.data
+      ? {
+          id: "ghost",
+          name: ghost.data.display_name,
+          note: `#1 today · ${ghost.data.wpm} wpm`,
+          typed: ghostChars(ghost.data.offsets_ms, stats.elapsedMs),
+        }
+      : !isDaily && pacer > 0
+        ? { id: "pacer", name: "Pacer", note: `${pacer} wpm`, typed: pacerChars(pacer, stats.elapsedMs, total) }
+        : null;
 
   // Daily: once a run is scored, where the player stands on today's board.
   const dailyBoard = useQuery({
@@ -175,7 +211,37 @@ export default function PracticePage({ guest = false }: { guest?: boolean }) {
             }}
             options={([1, 2, 3] as const).map((d) => ({ value: d, label: d }))}
           />
+          <Segmented
+            label="Pacer"
+            value={pacer}
+            onChange={setPacer}
+            options={([0, 40, 60, 80] as const).map((w) => ({ value: w, label: w === 0 ? "Off" : `${w}` }))}
+          />
         </div>
+      )}
+
+      {isDaily && ghost.data && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant={ghostOn ? "secondary" : "primary"}
+            aria-pressed={ghostOn}
+            onClick={() => setGhostOn((on) => !on)}
+          >
+            {ghostOn ? "Stop racing the #1" : "Race today's #1"}
+          </Button>
+          <span className="text-sm text-muted" data-testid="ghost-offer">
+            <bdi>{ghost.data.display_name}</bdi>, {ghost.data.wpm} wpm — their run, replayed from its key timings.
+          </span>
+        </div>
+      )}
+      {isDaily && ghost.isError && ghost.error instanceof ApiError && ghost.error.status === 404 && (
+        <p className="m-0 text-sm text-muted" data-testid="no-ghost">
+          Nobody has a counted run on today&apos;s text yet. Finish one, and you are the #1 the next player races.
+        </p>
+      )}
+
+      {text.data && opponent && (
+        <PaceRows runners={[you, opponent]} total={total} dir={LANGUAGES[text.data.language].dir} />
       )}
 
       {text.isPending && <p className="m-0 text-muted">Loading text…</p>}

@@ -6,11 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials
 
-from app.core.deps import SessionDep, optional_bearer
+from app.core.deps import CurrentUser, SessionDep, optional_bearer
 from app.core.errors import ApiError
 from app.core.security import InvalidTokenError, TokenType, decode_token
 from app.models import Language, SessionMode, User
-from app.schemas.stats import DailyOut, LeaderboardOut, LeaderboardRowOut
+from app.schemas.stats import DailyOut, GhostOut, LeaderboardOut, LeaderboardRowOut
 from app.schemas.text import TextOut
 from app.services import stats, users
 from app.services.stats import Period, Ranking
@@ -106,4 +106,25 @@ async def get_daily_leaderboard(
         # One text, one day: ties are common and a gap after each one reads as a
         # missing player, so the daily board numbers them densely (ADR-025).
         ranking="dense",
+    )
+
+
+@router.get("/daily/ghost")
+async def get_daily_ghost(session: SessionDep, user: CurrentUser, lang: Language) -> GhostOut:
+    """Today's #1 in this language, for racing against (ADR-035). Signed-in only, like
+    the daily itself. 404 until somebody has a valid run on today's text."""
+    day = stats.today()
+    text = await stats.daily_text(session, lang, day)
+    if text is None:
+        raise ApiError(404, "not_found", "No text available for that language")
+    ghost = await stats.daily_ghost(session, language=lang, text_id=text.id)
+    if ghost is None:
+        raise ApiError(404, "no_ghost", "Nobody has a counted run on today's text yet")
+    return GhostOut(
+        day=day,
+        language=lang,
+        text_id=text.id,
+        display_name=ghost.display_name,
+        wpm=ghost.wpm,
+        offsets_ms=ghost.offsets_ms,
     )
