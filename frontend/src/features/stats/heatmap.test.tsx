@@ -99,6 +99,19 @@ describe('keyboard heatmap', () => {
     expect(screen.queryByTestId('heatmap')).not.toBeInTheDocument()
   })
 
+  it('keeps a legend for every shade, including keys not typed enough to judge', () => {
+    render(<Heatmap language="ar" keys={[key('ا', 20, 0)]} />)
+
+    const legend = screen.getByTestId('heatmap-legend')
+    expect(legend).toHaveTextContent('Arabic 101')
+    const items = [...legend.querySelectorAll('li')].map((li) => li.textContent)
+    expect(items).toEqual(['0%', 'under 2%', '2–5%', '5–10%', '10%+', 'not typed, or under 10 presses'])
+    // The "not typed" swatch looks like an untyped key: dashed, outside the red ramp.
+    const swatch = legend.querySelectorAll('li')[5].querySelector('span')
+    expect(swatch?.className).toContain('border-dashed')
+    expect(screen.getByTestId('key-ض').className).toContain('border-dashed')
+  })
+
   it('every layout claims the space bar and its own letters', () => {
     expect(charsOnLayout('en').has(' ')).toBe(true)
     expect(charsOnLayout('he').has('ש')).toBe(true)
