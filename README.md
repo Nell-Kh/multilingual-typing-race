@@ -115,9 +115,9 @@ npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 **209 backend tests** (pytest, against a real PostgreSQL and Redis), **99 frontend tests**
-(Vitest + Testing Library) and a **3-case end-to-end smoke test** that boots the stack and
-drives the built frontend with Playwright. All three run in CI on every pull request
-([e2e/README.md](e2e/README.md)).
+(Vitest + Testing Library) and **4 end-to-end tests** that boot the stack and drive the
+built frontend with Playwright, one of them a whole race between two browsers. All three
+suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).
 
 ## Repo layout
 
