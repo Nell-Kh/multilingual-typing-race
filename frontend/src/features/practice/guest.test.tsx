@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -60,6 +60,20 @@ describe('guest practice', () => {
     expect(await screen.findByRole('textbox', { name: 'Type the text above' })).toBeInTheDocument()
     // No app navigation for a guest: stats, races and the daily belong to accounts.
     expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument()
+  })
+
+  it('a guest can race the pacer too, and their own row reads "You"', async () => {
+    window.history.pushState({}, '', '/try')
+    render(<App />)
+    const user = userEvent.setup()
+    await screen.findByRole('textbox', { name: 'Type the text above' })
+
+    await user.click(within(screen.getByRole('group', { name: 'Pacer' })).getByRole('button', { name: '40' }))
+
+    const you = screen.getByTestId('pace-you')
+    expect(you).toHaveTextContent('You')
+    expect(you).not.toHaveTextContent(/you\s*you/i)
+    expect(screen.getByTestId('pace-pacer')).toHaveTextContent('Pacer 40 wpm')
   })
 
   it('scores a guest run on the guest endpoint, without a token, and says it was not saved', async () => {

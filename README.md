@@ -31,7 +31,7 @@ Status: **v1.0 — complete.**
 
 ## Engineering highlights
 
-- **220 backend tests** (pytest against a real PostgreSQL and Redis) and **124 frontend tests** (Vitest + Testing Library).
+- **220 backend tests** (pytest against a real PostgreSQL and Redis) and **125 frontend tests** (Vitest + Testing Library).
 - **5 end-to-end tests in 3 Playwright specs**, run in CI against the built frontend and a real API — including a whole race between two browsers, and a visitor trying it without an account.
 - **The server is the judge**: seven validation rules on every log (empty, too few keystrokes, replay does not reproduce the text, time running backwards, median gap under 30 ms, 10+ keys at machine speed, and in a race a duration that disagrees with the server's clock by over 1.5 s), plus a review flag above 250 WPM.
 - **Race state that survives restarts, double starts and second tabs**: rooms live in Redis, every transition is a Lua compare-and-set, and timed transitions are applied by whichever server next looks at the room ([ADR-031](docs/DECISIONS.md)).
@@ -157,7 +157,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**220 backend tests** (pytest, against a real PostgreSQL and Redis), **124 frontend tests**
+**220 backend tests** (pytest, against a real PostgreSQL and Redis), **125 frontend tests**
 (Vitest + Testing Library) and **5 end-to-end tests** that boot the stack and drive the
 built frontend with Playwright, one a whole race between two browsers and one a visitor trying it without an account. All three
 suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).

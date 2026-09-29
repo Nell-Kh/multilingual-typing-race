@@ -114,8 +114,9 @@ export default function PracticePage({ guest = false }: { guest?: boolean }) {
   const total = Array.from(text.data?.content ?? "").length;
   const you: Runner = {
     id: "you",
+    // A guest has no name to show: "You" alone, not "You you".
     name: me?.display_name ?? "You",
-    note: "you",
+    note: me ? "you" : "",
     typed: correctPrefix(engine.typed, engine.target),
     highlight: true,
   };
