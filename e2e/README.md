@@ -1,8 +1,18 @@
-# End-to-end smoke test
+# End-to-end tests
 
-One journey through the **built** frontend and a **real** API: register → practice
-run → the server scores it → the run appears on the leaderboard, plus the daily
-challenge opened from the home card and a reload that has to keep you signed in.
+Journeys through the **built** frontend and a **real** API:
+
+- `smoke.spec.ts` — register → practice run → the server scores it → the run
+  appears on the leaderboard; the daily challenge opened from the home card; a
+  reload that has to keep you signed in.
+- `race.spec.ts` — a race between two browser contexts (two separate sign-ins):
+  one opens a room, the other joins by its code, both see the countdown with the
+  input locked, both type the text, and both get the same results table, two rows
+  with the server's exact times. The typing is scripted at a fixed 80 ms and
+  130 ms per key, so the finishing order is decided before the test starts and
+  both runs stay inside what the validator accepts from a person.
+
+Shared steps (registering, typing the text) live in `helpers.ts`.
 
 Nothing here is stubbed. That is the point: the bugs this exists to catch live
 between the frontend and the backend, where both sides' unit tests are green and
@@ -45,4 +55,4 @@ RATE_LIMIT_REGISTER_PER_IP=200 uvicorn app.main:app --port 8000
 ```
 
 The CI job does the last of these — raised, not switched off, so the limiter is
-still in the path the smoke test exercises.
+still in the path the tests exercise.
