@@ -122,9 +122,9 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**209 backend tests** (pytest, against a real PostgreSQL and Redis), **109 frontend tests**
-(Vitest + Testing Library) and **4 end-to-end tests** that boot the stack and drive the
-built frontend with Playwright, one of them a whole race between two browsers. All three
+**215 backend tests** (pytest, against a real PostgreSQL and Redis), **117 frontend tests**
+(Vitest + Testing Library) and **5 end-to-end tests** that boot the stack and drive the
+built frontend with Playwright, one a whole race between two browsers and one a visitor trying it without an account. All three
 suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).
 
 ## Repo layout

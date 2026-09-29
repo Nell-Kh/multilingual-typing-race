@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router'
-import type { LeaderboardRow, SessionResult } from '../../lib/api'
+import type { LeaderboardRow, ScoredRun } from '../../lib/api'
 import { Button } from '../../ui/Button'
 import { StatStrip } from '../../ui/StatStrip'
 import { reasonText } from './reasons'
 
 interface Props {
-  result: SessionResult
+  result: ScoredRun
+  /** A guest run: judged the same way, kept nowhere (ADR-034). */
+  guest?: boolean
   /** Free practice: fetch a different text. Absent on the daily challenge. */
   onNext?: () => void
   onRetry: () => void
@@ -20,7 +22,7 @@ function duration(ms: number): string {
 }
 
 /** What the server decided. Every number here came from the server, not the browser. */
-export function ResultsCard({ result, onNext, onRetry, daily }: Props) {
+export function ResultsCard({ result, guest = false, onNext, onRetry, daily }: Props) {
   const flagged = result.is_valid && result.invalid_reason === 'flagged_for_review'
   // On a phone the card lands below the fold; bring it up when the run is scored.
   const card = useRef<HTMLElement>(null)
@@ -28,7 +30,7 @@ export function ResultsCard({ result, onNext, onRetry, daily }: Props) {
     if (typeof card.current?.scrollIntoView === 'function') {
       card.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
-  }, [result.id])
+  }, [result])
   const worst = [...result.key_stats]
     .filter((k) => k.errors > 0)
     .sort((a, b) => b.errors - a.errors)
@@ -37,14 +39,20 @@ export function ResultsCard({ result, onNext, onRetry, daily }: Props) {
   return (
     <section ref={card} aria-label="results" className="flex flex-col gap-5 rounded-card border border-line bg-surface p-5 sm:p-8">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="m-0 text-2xl font-bold">{result.is_valid ? 'Result' : 'Not counted'}</h2>
+        <h2 className="m-0 text-2xl font-bold">{result.is_valid ? 'Result' : guest ? 'Not valid' : 'Not counted'}</h2>
         <span
           data-testid="result-status"
           className={`rounded-full px-3 py-1 text-xs font-medium ${
             !result.is_valid ? 'bg-err-soft text-err' : flagged ? 'bg-accent-soft text-accent' : 'bg-paper text-ok'
           }`}
         >
-          {!result.is_valid ? 'Rejected' : flagged ? 'Counted · flagged' : 'Counted'}
+          {!result.is_valid
+            ? 'Rejected'
+            : guest
+              ? 'Valid · not saved'
+              : flagged
+                ? 'Counted · flagged'
+                : 'Counted'}
         </span>
       </div>
 
@@ -74,6 +82,16 @@ export function ResultsCard({ result, onNext, onRetry, daily }: Props) {
               <span className="text-muted"> ×{k.errors}</span>
             </kbd>
           ))}
+        </p>
+      )}
+
+      {guest && (
+        <p className="m-0 text-sm" data-testid="guest-result-note">
+          This run was scored by the server and not saved.{' '}
+          <Link className="font-medium text-accent underline" to="/register">
+            Create an account
+          </Link>{' '}
+          to keep your stats, race friends and take the daily challenge.
         </p>
       )}
 

@@ -6,6 +6,7 @@ import LeaderboardPage from '../features/stats/LeaderboardPage'
 import StatsPage from '../features/stats/StatsPage'
 import LoginPage from '../pages/LoginPage'
 import RegisterPage from '../pages/RegisterPage'
+import TryPage from '../pages/TryPage'
 import { AppShell } from './AppShell'
 import { PublicShell } from './PublicShell'
 import { RequireAuth } from './RequireAuth'
@@ -20,6 +21,7 @@ export function createRouter() {
       children: [
         { path: '/login', Component: LoginPage },
         { path: '/register', Component: RegisterPage },
+        { path: '/try', Component: TryPage },
       ],
     },
     {

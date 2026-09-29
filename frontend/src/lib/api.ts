@@ -202,6 +202,29 @@ export interface SessionResult {
   key_stats: KeyStat[]
 }
 
+/** A guest run's verdict (ADR-034): the same numbers, and nothing stored — no id. */
+export interface GuestResult {
+  saved: false
+  text_id: string
+  language: Language
+  duration_ms: number
+  wpm: number
+  cpm: number
+  raw_wpm: number
+  accuracy: number
+  error_count: number
+  keystroke_count: number
+  is_valid: boolean
+  invalid_reason: string | null
+  key_stats: KeyStat[]
+}
+
+/** What the results card needs from either kind of run. */
+export type ScoredRun = Pick<
+  SessionResult,
+  'duration_ms' | 'wpm' | 'accuracy' | 'error_count' | 'is_valid' | 'invalid_reason' | 'key_stats'
+>
+
 export const sessions = {
   submit: (
     text_id: string,
@@ -212,6 +235,12 @@ export const sessions = {
     request<SessionResult>('/api/v1/sessions', {
       method: 'POST',
       body: { text_id, mode, started_at, keystrokes },
+    }),
+  /** Score a run without an account; the server keeps nothing (ADR-034). */
+  guest: (text_id: string, started_at: string, keystrokes: KeystrokeLog) =>
+    request<GuestResult>('/api/v1/sessions/guest', {
+      method: 'POST',
+      body: { text_id, started_at, keystrokes },
     }),
 }
 
