@@ -38,7 +38,13 @@ export function PaceRows({ runners, total, dir }: { runners: Runner[]; total: nu
               {initial(r.name)}
             </span>
             <span className="truncate text-sm font-medium">
-              <bdi>{r.name}</bdi> <span className="text-xs font-normal text-muted">{r.note}</span>
+              <bdi>{r.name}</bdi>
+              {r.note && (
+                <>
+                  {' '}
+                  <span className="text-xs font-normal text-muted">{r.note}</span>
+                </>
+              )}
             </span>
             <div
               dir={dir}
