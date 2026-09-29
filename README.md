@@ -40,6 +40,10 @@ Status: **v1.0 — complete.**
 
 ## Screenshots
 
+A visitor with no account: "Try it now" on the landing page, Arabic, the 60 WPM pacer, and the server's verdict at the end, not saved. The typing is scripted at a human pace.
+
+![A guest run in Arabic against the 60 WPM pacer: the landing page, Try it now, two race rows filling from the right as the sentence turns green, and the server's result marked valid and not saved](docs/img/guest-pacer-arabic.gif)
+
 Practising in Arabic, mid-run (typed by a script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ش of أشعلنا — and it stays joined to the ع after it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). A wrong letter is marked by background as well as colour (ADR-032).
 
 <picture>
