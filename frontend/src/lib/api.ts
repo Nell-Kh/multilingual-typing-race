@@ -230,6 +230,9 @@ export interface RoomPlayer {
   wpm: number | null
   accuracy: number | null
   valid: boolean | null
+  /** Live frames only (race-protocol §4); the HTTP preview leaves them out. */
+  duration_ms?: number | null
+  reason?: string | null
 }
 
 export interface RoomPreview {

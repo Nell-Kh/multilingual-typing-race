@@ -1,8 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { LANGUAGES, directionOf } from '../../i18n/languages'
-import { stats, type KeystrokeLog, type RoomPlayer } from '../../lib/api'
+import type { KeystrokeLog, RoomPlayer } from '../../lib/api'
 import { Button } from '../../ui/Button'
 import { useTitle } from '../../ui/useTitle'
 import { useAuth } from '../auth/store'
@@ -156,20 +155,6 @@ export default function RoomPage() {
       ? Math.max(0, Math.ceil((Date.parse(view.startsAt) - now) / 1000))
       : null
 
-  // My own run, from the server: its exact time and, if it was not counted, why.
-  // The race frames carry neither (docs/race-protocol.md §4), my history does.
-  const myRow = me ? view.players.find((p) => p.id === me.id) : undefined
-  const mine = useQuery({
-    queryKey: ['me', 'sessions', 'race', view.startedAt],
-    queryFn: () => stats.sessions(view.language),
-    enabled: Boolean(myRow?.finished_at) && view.startedAt !== null,
-    select: (page) =>
-      page.items.find(
-        (s) => s.mode === 'race' && view.startedAt !== null && Date.parse(s.created_at) >= Date.parse(view.startedAt),
-      ),
-    retry: false,
-  })
-
   // ---- actions --------------------------------------------------------------------------
   const isHost = me !== null && view.hostId === me.id
   function leave() {
@@ -237,11 +222,8 @@ export default function RoomPage() {
 
       {view.state === 'finished' && view.results && (
         <Results
-          view={view}
           results={view.results}
           meId={me?.id ?? null}
-          myTimeMs={mine.data?.duration_ms ?? null}
-          myReason={mine.data && !mine.data.is_valid ? mine.data.invalid_reason : null}
           isHost={isHost}
           onPlayAgain={() => socket.current?.send({ type: 'play_again' })}
           onLeave={leave}
@@ -466,32 +448,21 @@ function ProgressRow({
 }
 
 function Results({
-  view,
   results,
   meId,
-  myTimeMs,
-  myReason,
   isHost,
   onPlayAgain,
   onLeave,
 }: {
-  view: RoomView
   results: RaceResultRow[]
   meId: string | null
-  myTimeMs: number | null
-  myReason: string | null
   isHost: boolean
   onPlayAgain: () => void
   onLeave: () => void
 }) {
-  const byId = new Map(view.players.map((p) => [p.id, p]))
-  const start = view.startedSeenAt ? Date.parse(view.startedSeenAt) : null
-
+  // Every time and every reason is the server's, the same for everyone in the room (ADR-033).
   function timeOf(r: RaceResultRow): string {
-    if (r.dnf) return '–'
-    if (r.player_id === meId && myTimeMs !== null) return seconds(myTimeMs)
-    const finished = byId.get(r.player_id)?.finished_at
-    return finished && start !== null ? `≈${seconds(Date.parse(finished) - start)}` : '–'
+    return r.dnf || r.duration_ms === null ? '–' : seconds(r.duration_ms)
   }
 
   function statusOf(r: RaceResultRow): ReactNode {
@@ -500,9 +471,9 @@ function Results({
       return (
         <span className="text-err">
           not counted
-          {r.player_id === meId && myReason && (
-            <span className="block text-xs text-muted" data-testid="result-reason">
-              {reasonText(myReason)}
+          {r.reason && (
+            <span className="block text-xs text-muted" data-testid={`result-reason-${r.player_id}`}>
+              {reasonText(r.reason)}
             </span>
           )}
         </span>
@@ -572,7 +543,7 @@ function Results({
         </table>
       </div>
       <p className="m-0 text-xs text-muted">
-        Places and speeds are the server&apos;s. Other players&apos; times (≈) are measured when their finish reached you.
+        Places, speeds and times are the server&apos;s.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         {isHost ? (

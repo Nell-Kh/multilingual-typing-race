@@ -18,6 +18,10 @@ export interface RaceResultRow {
   wpm: number | null
   accuracy: number | null
   valid: boolean | null
+  /** The run's recorded duration; null for a player who did not finish (ADR-033). */
+  duration_ms: number | null
+  /** The validator's code when the run was refused, otherwise null. */
+  reason: string | null
   dnf: boolean
 }
 
@@ -49,6 +53,8 @@ export type ServerFrame =
       wpm: number
       accuracy: number
       valid: boolean
+      duration_ms: number
+      reason: string | null
     }
   | { type: 'race_over'; results: RaceResultRow[] }
   | { type: 'error'; code: string; message: string }

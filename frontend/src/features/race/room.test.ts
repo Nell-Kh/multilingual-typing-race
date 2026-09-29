@@ -94,7 +94,7 @@ describe('room reducer', () => {
       { type: 'countdown', text, starts_at: 'x' },
       { type: 'started', started_at: 'x' },
       { type: 'progress', player_id: 'b', typed: 2, errors: 1 },
-      { type: 'player_finished', player_id: 'a', place: 1, wpm: 55, accuracy: 98, valid: true },
+      { type: 'player_finished', player_id: 'a', place: 1, wpm: 55, accuracy: 98, valid: true, duration_ms: 4200, reason: null },
     ])
 
     const [a, b] = v.players
@@ -103,12 +103,14 @@ describe('room reducer', () => {
     expect(a.place).toBe(1)
     expect(a.wpm).toBe(55)
     expect(a.typed).toBe(3) // finished players show a full bar
+    expect(a.duration_ms).toBe(4200)
+    expect(a.reason).toBeNull()
   })
 
   it('race_over carries the results; errors are kept until the next good frame', () => {
     const results = [
-      { player_id: 'a', display_name: 'a', place: 1, wpm: 55, accuracy: 98, valid: true, dnf: false },
-      { player_id: 'b', display_name: 'b', place: null, wpm: null, accuracy: null, valid: null, dnf: true },
+      { player_id: 'a', display_name: 'a', place: 1, wpm: 55, accuracy: 98, valid: true, duration_ms: 4200, reason: null, dnf: false },
+      { player_id: 'b', display_name: 'b', place: null, wpm: null, accuracy: null, valid: null, duration_ms: null, reason: null, dnf: true },
     ]
     const v = replay([
       SNAPSHOT,
