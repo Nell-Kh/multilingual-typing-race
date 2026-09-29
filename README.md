@@ -2,19 +2,69 @@
 
 **Type in English · עברית · العربية**
 
-The repository is named `multilingual-typing-race`; Keyrace is the product.
+[![CI](https://github.com/Nell-Kh/multilingual-typing-race/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Nell-Kh/multilingual-typing-race/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Nell-Kh/multilingual-typing-race)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/Nell-Kh/multilingual-typing-race)](https://github.com/Nell-Kh/multilingual-typing-race/releases/latest)
 
-**Live:** [web-production-1f908.up.railway.app](https://web-production-1f908.up.railway.app) · API health: [`/healthz`](https://api-production-57dab.up.railway.app/healthz)
+**[Live](https://web-production-1f908.up.railway.app)** · **[Try it without an account](https://web-production-1f908.up.railway.app/try)** · [API health](https://api-production-57dab.up.railway.app/healthz) · [Docs](#docs)
 
-A TypeRacer-style typing trainer for **Hebrew, Arabic and English**: practice alone or race friends in real time, track WPM / accuracy / weak keys over time, leaderboards per language, daily challenge.
+![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars filling from the right as the text turns green right to left, and the server's results with places, WPM and times](docs/img/race-hebrew.gif)
 
-Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew and Arabic arrive with vowel marks the keyboard cannot produce, with typographic punctuation that is not the punctuation on the key, and with letters that look the same to a reader and are different characters to a computer — ך and כ, أ and ا. Arabic letters change shape depending on their neighbours, so a renderer that draws one character at a time breaks the word. Every text here is normalized once at import so that what is displayed is exactly what a keyboard can produce, and the renderer keeps the shaping intact ([docs/rtl-notes.md](docs/rtl-notes.md)).
+<sub>A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 150 ms and 205 ms per key, which the server scored at 76.52 and 56.95 WPM. Everything else is the real stack: the server's countdown, the relay, the validator, and the places, speeds and times it computed — the same table on both players' screens. A steady rhythm at a human pace is inside what the validator accepts; it is built to reject pasted text and machine-speed input, not a script that types like a person (see [How scoring works](#how-scoring-works)).</sub>
 
-**The server is the judge.** The browser never sends a score. It sends the raw keystroke log — `[t_ms, expected, typed]` per key — and the server replays it, recomputes every number, and decides whether the run counts at all. A client that lies has to lie in a log that replays to the target text at a human rhythm.
+## What it is
 
-> Status: **v1.0 — complete.** Working today: practice in Hebrew, Arabic or English; race up to four friends (five players to a room) in real time over WebSockets; a daily challenge that is the same text for everyone and changes at midnight Israel time; and per-language stats — speed, accuracy, history, a keyboard heatmap of the keys you miss, and daily / weekly / all-time leaderboards; light and dark mode, and every page fits a 360px phone. Every run is scored and validated server-side from the raw keystroke log. The interface itself is English-only for now (ADR-017); see [Planned](#planned).
+A real-time typing trainer and race for Hebrew, Arabic and English. The browser sends only the raw keystroke log; the server replays every keystroke, computes every score and decides whether a run counts. Hebrew and Arabic are handled properly: texts are normalized to what a keyboard can type, and Arabic letters keep their joined shapes as you type.
+
+## Features
+
+- **Practice** in any of the three languages at three difficulties — with an account, or as a guest whose runs are scored the same way and not saved.
+- **Real-time races** of up to 5 players, joined by a room code: server countdown, live progress bars, places decided by the server.
+- **Daily challenge**: one text per language, the same for everyone, new at midnight Israel time, with its own board.
+- **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss on your own keyboard layout.
+- **Leaderboards** per language — all-time, weekly and daily — with tied speeds sharing a rank and your own row pinned when you are outside the top.
+- **Light and dark mode**, following the system setting.
+- **Works on a 360px phone**, right to left as well as left to right.
+
+Status: **v1.0 — complete.**
+
+## Engineering highlights
+
+- **215 backend tests** (pytest against a real PostgreSQL and Redis) and **117 frontend tests** (Vitest + Testing Library).
+- **5 end-to-end tests in 3 Playwright specs**, run in CI against the built frontend and a real API — including a whole race between two browsers, and a visitor trying it without an account.
+- **The server is the judge**: seven validation rules on every log (empty, too few keystrokes, replay does not reproduce the text, time running backwards, median gap under 30 ms, 10+ keys at machine speed, and in a race a duration that disagrees with the server's clock by over 1.5 s), plus a review flag above 250 WPM.
+- **Race state that survives restarts, double starts and second tabs**: rooms live in Redis, every transition is a Lua compare-and-set, and timed transitions are applied by whichever server next looks at the room ([ADR-031](docs/DECISIONS.md)).
+- **Hebrew and Arabic by design**: import-time normalization of niqqud, tashkeel and typographic punctuation; one span per character with the browser keeping Arabic joined ([docs/rtl-notes.md](docs/rtl-notes.md)).
+- **34 architecture decision records**, each with its context, decision and cost: [docs/DECISIONS.md](docs/DECISIONS.md).
+
+## Screenshots
+
+Practising in Arabic, mid-run (typed by a script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ش of أشعلنا — and it stays joined to the ع after it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). A wrong letter is marked by background as well as colour (ADR-032).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/practice-arabic-dark.png">
+  <img alt="The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter still joined to the next one, and live speed, accuracy, errors and time underneath" src="docs/img/practice-arabic.png">
+</picture>
+
+The stats page, filled by scripted practice runs: best and average per language, every recent run with its 7-run moving average, and the keys you miss on Arabic 101. A key typed fewer than 10 times is dashed rather than coloured, so "barely typed" cannot be read as "never missed" (ADR-025).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/stats-heatmap-dark.png">
+  <img alt="The stats page: per-language cards, a speed chart with each run and the 7-run average, and an Arabic keyboard heatmap where missed keys are shaded red" src="docs/img/stats-heatmap.png">
+</picture>
+
+On a phone, right to left: Hebrew practice at 390px, one wrong letter on screen.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/img/phone-hebrew-dark.png">
+  <img alt="The practice page on a 390px phone in Hebrew: the sentence typed from the right, green behind the caret, one wrong letter marked, and the live numbers below" src="docs/img/phone-hebrew.png" width="300">
+</picture>
+
+<sub>GitHub shows the dark screenshots to readers whose system is in dark mode, the light ones otherwise.</sub>
 
 ## How scoring works
+
+**The server is the judge.** The browser never sends a score. It sends the raw keystroke log — `[t_ms, expected, typed]` per key — and the server replays it, recomputes every number, and decides whether the run counts at all. A client that lies has to lie in a log that replays to the target text at a human rhythm.
 
 The browser sends only the keystroke log — `[t_ms, expected, typed]` per key, `"\b"` for backspace — never a number. The server replays it and computes:
 
@@ -29,31 +79,9 @@ The same formulas apply to all three languages. A session is stored as invalid �
 
 ## Hebrew and Arabic
 
+Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew and Arabic arrive with vowel marks the keyboard cannot produce, with typographic punctuation that is not the punctuation on the key, and with letters that look the same to a reader and are different characters to a computer — ך and כ, أ and ا. Arabic letters change shape depending on their neighbours, so a renderer that draws one character at a time breaks the word. Every text here is normalized once at import so that what is displayed is exactly what a keyboard can produce, and the renderer keeps the shaping intact ([docs/rtl-notes.md](docs/rtl-notes.md)).
+
 What you see is what you type: every text is normalized once at import (niqqud and tashkeel stripped, typographic punctuation mapped to the keys on the SI-1452 / Arabic 101 layouts, letters matched strictly — ך ≠ כ, أ ≠ ا) and the same string is displayed and validated. The typing box renders one span per character in all three languages; browsers keep Arabic letters joined across spans as long as the font is identical, which we measured before deciding not to build a second renderer. Details, rules and the reasoning: [docs/rtl-notes.md](docs/rtl-notes.md).
-
-## What it looks like
-
-A race recorded from the host's screen: two players, one Hebrew sentence, the text hidden until the countdown, both progress bars fed over one WebSocket each, and the places decided by the server from each player's keystroke log. **The typing is scripted**: a Playwright script drives two browser sessions, "Nell" and "Sami", at a fixed 150 ms and 205 ms per key, which the server scored at 76.52 and 56.95 WPM. Everything else is the real stack: the server's countdown, the relay, the validator, and the places, speeds and times it computed — the same table on both players' screens. A steady rhythm at a human pace is inside what the validator accepts; it is built to reject pasted text and machine-speed input, not a script that types like a person (see [How scoring works](#how-scoring-works)).
-
-![A two-player race in Hebrew: the lobby, the countdown revealing the sentence, both progress bars filling from the right as the text turns green right to left, and the server's results with places, WPM and times](docs/img/race-hebrew.gif)
-
-Practising in Arabic, mid-run (typed by the same kind of script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ل of الجسر — and it stays joined to the ج after it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). A wrong letter is marked by background as well as colour, so it does not depend on telling red from green (ADR-032). Speed, accuracy and errors update as you type; the numbers that count are the server's.
-
-![The practice page mid-run in Arabic: a partly typed sentence with one mistyped letter still joined to its neighbour, and live speed, accuracy, errors and time underneath](docs/img/practice-arabic.png)
-
-The stats page, filled by scripted practice runs: best and average per language, every recent run with its 7-run moving average, and the keys you miss on the layout you actually type on — here Arabic 101. A key typed fewer than 10 times is dashed rather than coloured, so "barely typed" cannot be read as "never missed" (ADR-025).
-
-![The stats page: per-language cards, a speed chart with each run and the 7-run average, and an Arabic keyboard heatmap where missed keys are shaded red](docs/img/stats-heatmap.png)
-
-On a phone, right to left: Hebrew practice at 390px, one wrong letter on screen. The text, the caret and the error mark follow the text's direction; the page around it stays put.
-
-<img src="docs/img/phone-hebrew.png" alt="The practice page on a 390px phone in Hebrew: the sentence typed from the right, green behind the caret, one wrong letter marked, and the live numbers below" width="300">
-
-## Accounts
-
-Email and password (argon2), a short-lived access token held in memory and a rotating refresh token in an httpOnly cookie: using a refresh token spends it, so a stolen one stops working the moment the real user refreshes. Registration, login and refresh are rate-limited in Redis — per client address, plus a counter of failed logins per email address that any successful login clears. Ceilings are environment settings, not constants. See [ADR-009](docs/DECISIONS.md) and [ADR-022](docs/DECISIONS.md).
-
-**Keystroke logs are kept.** Each run's raw log — the time and character of every key — is stored for as long as the run exists, so any score can be replayed and checked again later. It is never returned by the API; the run's numbers are ([ADR-029](docs/DECISIONS.md)).
 
 ## How it fits together
 
@@ -89,6 +117,12 @@ sequenceDiagram
     S->>S: recompute WPM, CPM, accuracy, per-key stats
     S-->>C: the server's numbers (the client's were display only)
 ```
+
+## Accounts
+
+Email and password (argon2), a short-lived access token held in memory and a rotating refresh token in an httpOnly cookie: using a refresh token spends it, so a stolen one stops working the moment the real user refreshes. Registration, login and refresh are rate-limited in Redis — per client address, plus a counter of failed logins per email address that any successful login clears. Ceilings are environment settings, not constants. See [ADR-009](docs/DECISIONS.md) and [ADR-022](docs/DECISIONS.md).
+
+**Keystroke logs are kept.** Each run's raw log — the time and character of every key — is stored for as long as the run exists, so any score can be replayed and checked again later. It is never returned by the API; the run's numbers are ([ADR-029](docs/DECISIONS.md)).
 
 ## Stack
 
@@ -128,6 +162,8 @@ built frontend with Playwright, one a whole race between two browsers and one a 
 suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).
 
 ## Repo layout
+
+The repository is named `multilingual-typing-race`; Keyrace is the product.
 
 ```
 backend/
