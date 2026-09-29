@@ -27,7 +27,7 @@ A real-time typing trainer and race for Hebrew, Arabic and English. The browser 
 - **Light and dark mode**, following the system setting.
 - **Works on a 360px phone**, right to left as well as left to right.
 
-Status: **v1.0 — complete.**
+Status: **v1.1 — complete.**
 
 ## Engineering highlights
 
