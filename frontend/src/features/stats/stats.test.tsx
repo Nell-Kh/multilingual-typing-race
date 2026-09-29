@@ -77,9 +77,11 @@ describe('stats page', () => {
     expect(screen.getByTestId('lang-he')).toHaveTextContent('37 s')
     expect(screen.getByTestId('trend')).toHaveAttribute('aria-label', 'WPM over the last 2 runs, latest 72.5')
 
-    expect(await screen.findByTestId('run-s1')).toHaveTextContent('yes')
+    expect(await screen.findByTestId('run-s1')).toHaveTextContent('counted')
+    expect(screen.getByTestId('run-s1')).not.toHaveTextContent('not counted')
+    expect(screen.getByTestId('run-card-s1')).toHaveTextContent('72.5 wpm') // the phone layout
     await user.click(screen.getByRole('button', { name: 'Load more' }))
-    expect(await screen.findByTestId('run-s3')).toHaveTextContent('no')
+    expect(await screen.findByTestId('run-s3')).toHaveTextContent('not counted')
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
     expect(requested.some((u) => u.includes('/me/sessions?cursor=abc'))).toBe(true)
   })
@@ -166,23 +168,130 @@ describe('signing in as somebody else', () => {
   })
 })
 
+describe('stats page when there is nothing yet', () => {
+  it('tells a new player, in plain words, where the numbers will come from', async () => {
+    vi.mocked(fetch).mockImplementation((async (url: string) => {
+      const u = String(url)
+      if (u.includes('/auth/refresh')) return json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 })
+      if (u.includes('/auth/me')) return json(ME)
+      if (u.includes('/me/stats')) return json({ languages: [], trend: [] })
+      if (u.includes('/me/keys')) return json({ language: 'en', keys: [] })
+      if (u.includes('/me/sessions')) return json({ items: [], next_cursor: null })
+      throw new Error(`unexpected ${u}`)
+    }) as typeof fetch)
+    window.history.pushState({}, '', '/stats')
+    render(<App />)
+
+    const empty = await screen.findByTestId('stats-empty')
+    expect(empty).toHaveTextContent('No counted runs yet')
+    expect(empty).toHaveTextContent('Finish a practice run and this page fills in')
+    expect(within(empty).getByRole('link', { name: 'Start practice' })).toHaveAttribute('href', '/practice')
+    // One message, not an empty card per section.
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'history' })).not.toBeInTheDocument())
+    expect(screen.queryByTestId('trend')).not.toBeInTheDocument()
+  })
+})
+
 describe('leaderboard page', () => {
-  it('lists the board, marks you outside the top, and switches period and language', async () => {
+  function serveBoard(board: unknown) {
+    vi.mocked(fetch).mockImplementation((async (url: string) => {
+      const u = String(url)
+      requested.push(u)
+      if (u.includes('/auth/refresh')) return json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 })
+      if (u.includes('/auth/me')) return json(ME)
+      if (u.includes('/leaderboards')) return json(board)
+      throw new Error(`unexpected ${u}`)
+    }) as typeof fetch)
+  }
+
+  it('lists the board, and switches period with tabs and language with the segmented control', async () => {
     window.history.pushState({}, '', '/leaderboard')
     render(<App />)
     const user = userEvent.setup()
 
-    expect(await screen.findByTestId('row-1')).toHaveTextContent('Sami')
-    expect(screen.getByTestId('row-me')).toHaveTextContent('7')
-    expect(screen.getByTestId('row-me')).toHaveTextContent('Nell(you)')
+    expect(await screen.findByTestId('row-o1')).toHaveTextContent('Sami')
+    const tabs = screen.getByRole('tablist', { name: 'Period' })
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['All-time', 'Weekly', 'Daily'])
+    expect(screen.getByRole('tab', { name: 'Weekly' })).toHaveAttribute('aria-selected', 'true')
 
-    await user.click(screen.getByRole('button', { name: 'All time' }))
-    await waitFor(() =>
-      expect(requested.some((u) => u.includes('/leaderboards?lang=en&period=all'))).toBe(true),
-    )
-    await user.click(screen.getByRole('button', { name: 'العربية' }))
-    await waitFor(() =>
-      expect(requested.some((u) => u.includes('/leaderboards?lang=ar&period=all'))).toBe(true),
-    )
+    await user.click(screen.getByRole('tab', { name: 'All-time' }))
+    await waitFor(() => expect(requested.some((u) => u.includes('/leaderboards?lang=en&period=all'))).toBe(true))
+    expect(screen.getByRole('tab', { name: 'All-time' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'tab-all')
+
+    // Arrow keys move along the tabs, as in any tab list.
+    await user.keyboard('{ArrowRight}{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Daily' })).toHaveFocus()
+    await waitFor(() => expect(requested.some((u) => u.includes('/leaderboards?lang=en&period=day'))).toBe(true))
+
+    await user.click(within(screen.getByRole('group', { name: 'Language' })).getByRole('button', { name: 'العربية' }))
+    await waitFor(() => expect(requested.some((u) => u.includes('/leaderboards?lang=ar&period=day'))).toBe(true))
+  })
+
+  it('pins your own row at the bottom when you are outside the top', async () => {
+    window.history.pushState({}, '', '/leaderboard')
+    render(<App />)
+
+    const mine = await screen.findByTestId('row-pinned')
+    expect(mine).toHaveAttribute('data-pinned', 'true')
+    expect(mine).toHaveAttribute('aria-current', 'true')
+    expect(mine).toHaveTextContent('7')
+    expect(mine).toHaveTextContent('Nellyou')
+    expect(mine.className).toContain('sticky')
+    // It comes after the top rows, not among them.
+    const rows = screen.getAllByRole('row').filter((r) => r.hasAttribute('data-rank'))
+    expect(rows.map((r) => r.getAttribute('data-rank'))).toEqual(['1', '2', '7'])
+  })
+
+  it('highlights your row in place, unpinned, when you are in the top', async () => {
+    serveBoard({
+      ...BOARD,
+      rows: [...BOARD.rows, { rank: 3, user_id: 'me', display_name: 'Nell', wpm: 61, accuracy: 96, started_at: '' }],
+      me: { rank: 3, user_id: 'me', display_name: 'Nell', wpm: 61, accuracy: 96, started_at: '' },
+    })
+    window.history.pushState({}, '', '/leaderboard')
+    render(<App />)
+
+    const inPlace = await screen.findByTestId('row-me') // the row for user id "me"
+    expect(inPlace).toHaveAttribute('data-rank', '3')
+    expect(inPlace).toHaveAttribute('aria-current', 'true')
+    expect(inPlace).not.toHaveAttribute('data-pinned')
+    expect(screen.queryByTestId('row-pinned')).not.toBeInTheDocument()
+  })
+
+  it('shows tied players with the same rank, exactly as the server ranked them', async () => {
+    serveBoard({
+      ...BOARD,
+      rows: [
+        { rank: 1, user_id: 'a', display_name: 'Maya', wpm: 90, accuracy: 99, started_at: '' },
+        { rank: 2, user_id: 'b', display_name: 'Omar', wpm: 80, accuracy: 98, started_at: '' },
+        { rank: 2, user_id: 'c', display_name: 'Lior', wpm: 80, accuracy: 97, started_at: '' },
+        { rank: 4, user_id: 'd', display_name: 'Dana', wpm: 70, accuracy: 96, started_at: '' },
+      ],
+      me: null,
+    })
+    window.history.pushState({}, '', '/leaderboard')
+    render(<App />)
+
+    await screen.findByTestId('row-d')
+    const ranks = ['a', 'b', 'c', 'd'].map((id) => within(screen.getByTestId(`row-${id}`)).getAllByRole('cell')[0].textContent)
+    expect(ranks).toEqual(['1', '2', '2', '4'])
+    expect(screen.queryByTestId('row-pinned')).not.toBeInTheDocument()
+  })
+
+  it('says so in plain words when nobody is on the board, and offers the way on', async () => {
+    serveBoard({ language: 'he', period: 'week', rows: [], me: null })
+    window.history.pushState({}, '', '/leaderboard?lang=he')
+    render(<App />)
+    const user = userEvent.setup()
+
+    const empty = await screen.findByTestId('board-empty')
+    expect(empty).toHaveTextContent('No counted runs in עברית this week.')
+    expect(empty).toHaveTextContent('Finish a run and you will be first on this board.')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+
+    await user.click(within(empty).getByRole('link', { name: 'Start practice' }))
+    // Practice opens in the remembered language, so the board's language is remembered first.
+    expect(localStorage.getItem('practice.language')).toBe('he')
   })
 })

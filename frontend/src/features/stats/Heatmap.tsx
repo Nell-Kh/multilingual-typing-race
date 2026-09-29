@@ -30,7 +30,7 @@ interface Bin {
 const BINS: Bin[] = [
   // Never missed: no fill at all. "Not typed yet" is also unfilled but keeps a
   // dashed border and muted ink, so the two are told apart without colour.
-  { max: 0.0001, label: 'none', className: 'bg-transparent' },
+  { max: 0.0001, label: '0%', className: 'bg-transparent' },
   { max: 0.02, label: 'under 2%', className: 'bg-red-100 dark:bg-red-500/25' },
   { max: 0.05, label: '2–5%', className: 'bg-red-200 dark:bg-red-500/40' },
   { max: 0.1, label: '5–10%', className: 'bg-red-300 dark:bg-red-500/60' },
@@ -44,7 +44,7 @@ const BINS: Bin[] = [
  */
 const MIN_SAMPLE = 10
 
-const UNJUDGED = 'border-dashed bg-gray-50 text-gray-400 dark:bg-gray-900 dark:text-gray-600'
+const UNJUDGED = 'border-dashed border-line bg-paper text-muted'
 
 /**
  * The size of one letter key, fitted to the space the board actually has.
@@ -86,7 +86,11 @@ export function Heatmap({ language, keys }: Props) {
   const strays = keys.filter((k) => !claimed.has(k.key) && k.correct + k.errors > 0)
 
   if (keys.length === 0) {
-    return <p className="text-sm text-gray-500">No counted runs in this language yet.</p>
+    return (
+      <p className="m-0 text-sm text-muted">
+        No counted runs in this language yet. Once you have one, the keys you miss are marked here.
+      </p>
+    )
   }
 
   return (
@@ -119,8 +123,8 @@ export function Heatmap({ language, keys }: Props) {
                     height: 'var(--key)',
                     fontSize: 'min(0.875rem, calc(var(--key) * 0.45))',
                   }}
-                  className={`flex shrink-0 items-center justify-center rounded border
-                    ${judged ? binOf(errorRate).className : UNJUDGED}`}
+                  className={`flex shrink-0 items-center justify-center rounded-[6px] border
+                    ${judged ? `border-line text-ink ${binOf(errorRate).className}` : UNJUDGED}`}
                 >
                   {key.label}
                 </span>
@@ -130,31 +134,36 @@ export function Heatmap({ language, keys }: Props) {
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-        <span>{layout.name} · missed</span>
-        {BINS.map((b) => (
-          <span key={b.label} className="flex items-center gap-1">
-            <span className={`inline-block h-3 w-3 rounded-sm border ${b.className}`} />
-            {b.label}
-          </span>
-        ))}
-        <span className="flex items-center gap-1">
-          <span className={`inline-block h-3 w-3 rounded-sm border ${UNJUDGED}`} />
-          under {MIN_SAMPLE} keystrokes
+      <div className="flex flex-col gap-1.5 text-xs text-muted" data-testid="heatmap-legend">
+        <span>
+          <span className="font-medium text-ink">{layout.name}</span> · share of presses missed
         </span>
+        <ul className="m-0 flex list-none flex-wrap items-center gap-x-3 gap-y-1.5 p-0">
+          {BINS.map((b) => (
+            <li key={b.label} className="flex items-center gap-1.5">
+              <span aria-hidden="true" className={`inline-block h-3.5 w-3.5 rounded-sm border border-line ${b.className}`} />
+              {b.label}
+            </li>
+          ))}
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden="true" className={`inline-block h-3.5 w-3.5 rounded-sm border ${UNJUDGED}`} />
+            not typed, or under {MIN_SAMPLE} presses
+          </li>
+        </ul>
       </div>
 
       {strays.length > 0 && (
-        <p className="text-xs text-gray-500" data-testid="stray-keys">
+        <p className="m-0 text-xs text-muted" data-testid="stray-keys">
           Not on this layout:{' '}
           {strays.map((k) => (
             <kbd
               key={k.key}
               title={`${k.key}: ${k.errors} missed of ${k.correct + k.errors}`}
-              className="mx-1 rounded border px-1 font-mono"
+              dir="ltr"
+              className="mx-1 inline-block rounded border border-line px-1 font-mono text-ink"
             >
-              {k.key === ' ' ? '␣' : k.key}
-              <span className="text-gray-400"> ×{k.correct + k.errors}</span>
+              <bdi>{k.key === ' ' ? '␣' : k.key}</bdi>
+              <span className="text-muted"> ×{k.correct + k.errors}</span>
             </kbd>
           ))}
         </p>
