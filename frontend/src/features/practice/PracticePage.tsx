@@ -13,7 +13,7 @@ import {
   sessions,
   texts,
   type Language,
-  type SessionResult,
+  type ScoredRun,
 } from "../../lib/api";
 import { dailyQuery, selectDailyText } from "../../lib/queries";
 import { isLanguage } from "../../i18n/languages";
@@ -27,11 +27,12 @@ import { useTitle } from "../../ui/useTitle";
 
 type Difficulty = 1 | 2 | 3;
 
-export default function PracticePage() {
+export default function PracticePage({ guest = false }: { guest?: boolean }) {
   const [params] = useSearchParams();
   // /practice?daily=1&lang=he — today's fixed text, scored on the daily board (ADR-019).
-  const isDaily = params.get("daily") === "1";
-  useTitle(isDaily ? "Daily challenge" : "Practice");
+  // A guest never gets the daily: its board is for accounts (ADR-034).
+  const isDaily = !guest && params.get("daily") === "1";
+  useTitle(isDaily ? "Daily challenge" : guest ? "Try it" : "Practice");
   const dailyLang = params.get("lang");
   const [difficulty, setDifficulty] = useState<Difficulty>(1);
   const [language, setLanguage] = useState<Language>(() =>
@@ -62,13 +63,16 @@ export default function PracticePage() {
   }, [text.data]);
 
   const submit = useMutation({
-    mutationFn: async (): Promise<SessionResult> => {
+    mutationFn: async (): Promise<ScoredRun> => {
       if (!text.data || engine.startedAt === null)
         throw new Error("nothing to submit");
       // startedAt is a monotonic clock; convert to wall-clock for the server.
       const startedAt = new Date(
         Date.now() - (performance.now() - engine.startedAt),
       );
+      // A guest run is scored by the same server code and stored nowhere (ADR-034).
+      if (guest)
+        return sessions.guest(text.data.id, startedAt.toISOString(), engine.keystrokes);
       return sessions.submit(
         text.data.id,
         startedAt.toISOString(),
@@ -93,7 +97,7 @@ export default function PracticePage() {
 
   // Daily: once a run is scored, where the player stands on today's board.
   const dailyBoard = useQuery({
-    queryKey: ["daily", "board", language, submit.data?.id],
+    queryKey: ["daily", "board", language, submit.submittedAt],
     queryFn: () => leaderboards.daily(language),
     enabled: isDaily && submit.isSuccess,
     retry: false,
@@ -128,6 +132,18 @@ export default function PracticePage() {
         <h1 className="m-0 text-2xl font-bold sm:text-3xl">
           {isDaily ? "Daily challenge" : "Practice"}
         </h1>
+        {guest && (
+          <p
+            data-testid="guest-banner"
+            className="m-0 rounded-control border border-line bg-accent-soft px-3 py-2 text-sm text-ink"
+          >
+            Guest run — not saved.{" "}
+            <Link className="font-medium text-accent underline" to="/register">
+              Create an account
+            </Link>{" "}
+            to keep your stats.
+          </p>
+        )}
         {isDaily && (
           <p className="m-0 text-sm text-muted">
             One text per day, the same for everyone.{" "}
@@ -205,7 +221,9 @@ export default function PracticePage() {
           <span>
             {submit.error instanceof ApiError
               ? submit.error.message
-              : "Could not reach the server to save the session"}
+              : guest
+                ? "Could not reach the server to score the run"
+                : "Could not reach the server to save the session"}
           </span>
           <Button onClick={() => submit.mutate()}>Retry</Button>
         </div>
@@ -213,6 +231,7 @@ export default function PracticePage() {
       {submit.data && (
         <ResultsCard
           result={submit.data}
+          guest={guest}
           onNext={isDaily ? undefined : next}
           onRetry={restart}
           daily={

@@ -53,3 +53,30 @@ class SessionResult(SessionOut):
     """Returned on submit: the row plus the per-key breakdown for the results screen."""
 
     key_stats: list[KeyStatOut]
+
+
+class GuestSubmit(BaseModel):
+    """A practice run from a visitor without an account: only the log (ADR-034)."""
+
+    text_id: uuid.UUID
+    started_at: datetime
+    keystrokes: list[list[object]] = Field(min_length=1, max_length=MAX_KEYSTROKES)
+
+
+class GuestResult(BaseModel):
+    """The server's verdict and numbers for a guest run. Nothing here was stored:
+    there is no id to fetch it by, and `saved` says so in the payload itself."""
+
+    saved: Literal[False] = False
+    text_id: uuid.UUID
+    language: Language
+    duration_ms: int
+    wpm: float
+    cpm: float
+    raw_wpm: float
+    accuracy: float
+    error_count: int
+    keystroke_count: int
+    is_valid: bool
+    invalid_reason: str | None
+    key_stats: list[KeyStatOut]

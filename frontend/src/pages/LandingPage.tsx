@@ -23,13 +23,17 @@ export default function LandingPage() {
           keyboard can type, and Arabic letters that stay joined as you go.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
-          <Link to="/register" className={`${LINK_BUTTON} bg-accent text-surface hover:opacity-90`}>
+          <Link to="/try" className={`${LINK_BUTTON} bg-accent text-surface hover:opacity-90`}>
+            Try it now
+          </Link>
+          <Link to="/register" className={`${LINK_BUTTON} border border-line bg-surface text-ink hover:bg-paper`}>
             Create account
           </Link>
-          <Link to="/login" className={`${LINK_BUTTON} border border-line bg-surface text-ink hover:bg-paper`}>
+          <Link to="/login" className={`${LINK_BUTTON} text-accent hover:bg-accent-soft`}>
             Log in
           </Link>
         </div>
+        <p className="m-0 text-sm text-muted">No account needed to try: guest runs are scored the same way and not saved.</p>
       </section>
 
       <section aria-label="What typing looks like" className="grid gap-3 sm:grid-cols-3">

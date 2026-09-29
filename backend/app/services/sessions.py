@@ -1,6 +1,8 @@
-"""Turn a submitted keystroke log into a stored, validated typing session."""
+"""Turn a submitted keystroke log into a validated typing session: scored for
+everyone, stored only for an account (ADR-034)."""
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,21 +25,32 @@ def _client_duration_ms(keystrokes: list[Keystroke]) -> int:
     return keystrokes[-1][0]
 
 
-async def record_session(
-    session: AsyncSession,
+@dataclass(frozen=True)
+class ScoredRun:
+    """Everything the server decides about one log, before anything is stored."""
+
+    keystrokes: list[Keystroke]
+    duration_ms: int
+    metrics: typing_metrics.Metrics
+    verdict: validator.Verdict
+
+    @property
+    def invalid_reason(self) -> str | None:
+        return self.verdict.reason or (
+            "flagged_for_review" if self.verdict.flagged_for_review else None
+        )
+
+
+def score_run(
     *,
-    user_id: uuid.UUID,
     text: Text,
     started_at: datetime,
     raw_keystrokes: list[list[object]],
-    mode: SessionMode = SessionMode.PRACTICE,
-    race_id: uuid.UUID | None = None,
     server_duration_ms: int | None = None,
     now: datetime | None = None,
-) -> TypingSession:
-    """Score and validate one keystroke log and store it. Practice and race runs
-    share everything except `mode`, the race link, and the extra server-clock
-    check races get (docs/race-protocol.md §5)."""
+) -> ScoredRun:
+    """Replay, measure and validate a log. Pure: no database, so a guest run and an
+    account's run are judged by exactly the same code (ADR-034)."""
     now = now or datetime.now(UTC)
     if started_at > now + timedelta(seconds=30):
         raise SessionRejectedError("started_at is in the future")
@@ -61,6 +74,37 @@ async def record_session(
         client_duration_ms=duration_ms,
         server_duration_ms=server_duration_ms,
     )
+    return ScoredRun(keystrokes, duration_ms, metrics, verdict)
+
+
+async def record_session(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    text: Text,
+    started_at: datetime,
+    raw_keystrokes: list[list[object]],
+    mode: SessionMode = SessionMode.PRACTICE,
+    race_id: uuid.UUID | None = None,
+    server_duration_ms: int | None = None,
+    now: datetime | None = None,
+) -> TypingSession:
+    """Score and validate one keystroke log and store it. Practice and race runs
+    share everything except `mode`, the race link, and the extra server-clock
+    check races get (docs/race-protocol.md §5)."""
+    run = score_run(
+        text=text,
+        started_at=started_at,
+        raw_keystrokes=raw_keystrokes,
+        server_duration_ms=server_duration_ms,
+        now=now,
+    )
+    keystrokes, duration_ms, metrics, verdict = (
+        run.keystrokes,
+        run.duration_ms,
+        run.metrics,
+        run.verdict,
+    )
 
     row = TypingSession(
         user_id=user_id,
@@ -78,8 +122,7 @@ async def record_session(
         error_count=metrics.error_count,
         keystroke_count=metrics.keystroke_count,
         is_valid=verdict.valid,
-        invalid_reason=verdict.reason
-        or ("flagged_for_review" if verdict.flagged_for_review else None),
+        invalid_reason=run.invalid_reason,
         keystrokes=[list(k) for k in keystrokes],
         key_stats=[
             SessionKeyStat(

@@ -3,11 +3,11 @@ import uuid
 from fastapi import APIRouter, status
 from sqlalchemy.orm import selectinload
 
-from app.core.deps import CurrentUser, RateLimiterDep, SessionDep, SettingsDep
+from app.core.deps import ClientIp, CurrentUser, RateLimiterDep, SessionDep, SettingsDep
 from app.core.errors import ApiError
 from app.core.limits import enforce
 from app.models import SessionMode, TypingSession
-from app.schemas.session import KeyStatOut, SessionResult, SessionSubmit
+from app.schemas.session import GuestResult, GuestSubmit, KeyStatOut, SessionResult, SessionSubmit
 from app.services import sessions, stats, texts
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -15,6 +15,8 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 # Scoring a run costs a replay of the whole keystroke log, so the ceiling is
 # per account rather than per address (ADR-026).
 BUCKET_SUBMIT = "sessions:submit:user"
+# A guest has no account, so the address is the only thing to count (ADR-034).
+BUCKET_GUEST = "sessions:guest:ip"
 
 
 def _result(row: TypingSession) -> SessionResult:
@@ -63,6 +65,52 @@ async def submit_session(
     except sessions.SessionRejectedError as exc:
         raise ApiError(422, "invalid_session", str(exc)) from exc
     return _result(row)
+
+
+@router.post("/guest")
+async def score_guest_run(
+    body: GuestSubmit,
+    ip: ClientIp,
+    session: SessionDep,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+) -> GuestResult:
+    """Score a practice run without an account. Same replay, metrics and validator
+    as POST /sessions; the difference is that nothing is written — no session row,
+    no key stats, so nothing reaches stats or leaderboards (ADR-034)."""
+    await enforce(limiter, settings, BUCKET_GUEST, ip, settings.rate_limit_guest_sessions_per_ip)
+    text = await texts.get_text(session, body.text_id)
+    if text is None or not text.is_active:
+        raise ApiError(404, "not_found", "Text not found")
+    try:
+        run = sessions.score_run(
+            text=text, started_at=body.started_at, raw_keystrokes=body.keystrokes
+        )
+    except sessions.SessionRejectedError as exc:
+        raise ApiError(422, "invalid_session", str(exc)) from exc
+    m = run.metrics
+    return GuestResult(
+        text_id=text.id,
+        language=text.language,
+        duration_ms=run.duration_ms,
+        wpm=m.wpm,
+        cpm=m.cpm,
+        raw_wpm=m.raw_wpm,
+        accuracy=m.accuracy,
+        error_count=m.error_count,
+        keystroke_count=m.keystroke_count,
+        is_valid=run.verdict.valid,
+        invalid_reason=run.invalid_reason,
+        key_stats=[
+            KeyStatOut(
+                key=key,
+                correct=stat.correct,
+                errors=stat.errors,
+                avg_latency_ms=stat.avg_latency_ms,
+            )
+            for key, stat in sorted(m.per_key.items())
+        ],
+    )
 
 
 @router.get("/{session_id}")

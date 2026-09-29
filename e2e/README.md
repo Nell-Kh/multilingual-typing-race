@@ -12,6 +12,10 @@ Journeys through the **built** frontend and a **real** API:
   130 ms per key, so the finishing order is decided before the test starts and
   both runs stay inside what the validator accepts from a person.
 
+- `guest.spec.ts` — a visitor with no account: the landing page, "Try it now", an
+  Arabic run scored by the real server with `saved: false` and no token sent, and
+  the account pages still asking to log in (ADR-034).
+
 Shared steps (registering, typing the text) live in `helpers.ts`.
 
 Nothing here is stubbed. That is the point: the bugs this exists to catch live

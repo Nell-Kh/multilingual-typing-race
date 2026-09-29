@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # so the account is the thing worth limiting (ADR-026).
     rate_limit_sessions_per_user: int = 60
     rate_limit_rooms_per_user: int = 20
+    # Guest practice has no account to count against, so it is counted per address.
+    # A guest run costs a replay and no write; this still stops a loop (ADR-034).
+    rate_limit_guest_sessions_per_ip: int = 30
 
     # Race timing (docs/race-protocol.md §2, §5, §6). Tests shrink these to milliseconds.
     race_countdown_seconds: float = 3.0
