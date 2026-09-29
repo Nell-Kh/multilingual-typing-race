@@ -68,3 +68,15 @@ class DailyOut(BaseModel):
     day: date
     language: Language
     text: TextOut
+
+
+class GhostOut(BaseModel):
+    """Today's #1 as a ghost (ADR-035): the public name and speed from the board, and
+    one time per character of the text. Never the characters that were typed."""
+
+    day: date
+    language: Language
+    text_id: uuid.UUID
+    display_name: str
+    wpm: float
+    offsets_ms: list[int]

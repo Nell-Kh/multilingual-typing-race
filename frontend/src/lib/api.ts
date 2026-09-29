@@ -370,6 +370,17 @@ export const leaderboards = {
   daily: (lang: Language) => request<Leaderboard>(`/api/v1/daily/leaderboard?lang=${lang}`),
 }
 
+/** Today's #1 as a ghost (ADR-035): public name and speed, one time per character. */
+export interface Ghost {
+  day: string
+  language: Language
+  text_id: string
+  display_name: string
+  wpm: number
+  offsets_ms: number[]
+}
+
 export const daily = {
   get: (lang: Language) => request<Daily>(`/api/v1/daily?lang=${lang}`, { auth: false }),
+  ghost: (lang: Language) => request<Ghost>(`/api/v1/daily/ghost?lang=${lang}`),
 }
