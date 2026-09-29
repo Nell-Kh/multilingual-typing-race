@@ -373,7 +373,7 @@ def test_pasted_log_gets_no_place(client: TestClient) -> None:
     (_, id1), (_, id2) = race["tokens"]
     target = race["text"]
 
-    ws1.send_json(  # every key at once: machine_run
+    ws1.send_json(  # every key at once: no gap between keys
         {
             "type": "finish",
             "started_at": race["started_at"],
@@ -382,14 +382,20 @@ def test_pasted_log_gets_no_place(client: TestClient) -> None:
     )
     cheat = until(ws2, "player_finished", player_id=id1)
     assert cheat["valid"] is False and cheat["place"] is None
+    # Everyone in the room is told why, and the run's own time (ADR-033).
+    assert cheat["reason"] == "median_gap_too_low"
+    assert cheat["duration_ms"] == 1
 
     finish(ws2, race)
     honest = until(ws1, "player_finished", player_id=id2)
     assert honest["valid"] is True and honest["place"] == 1
+    assert honest["reason"] is None and honest["duration_ms"] > 0
 
     over = until(ws1, "race_over")
     by_id = {r["player_id"]: r for r in over["results"]}
     assert by_id[id2]["place"] == 1 and by_id[id1]["place"] is None and by_id[id1]["dnf"] is False
+    assert (by_id[id1]["reason"], by_id[id1]["duration_ms"]) == ("median_gap_too_low", 1)
+    assert by_id[id2]["reason"] is None and by_id[id2]["duration_ms"] == honest["duration_ms"]
     close(ws1)
     close(ws2)
 

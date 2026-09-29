@@ -171,14 +171,23 @@ describe('room page', () => {
       expect(screen.getByRole('progressbar', { name: 'Sami progress' })).toHaveAttribute('aria-valuenow', '43'),
     )
 
-    ws.push({ type: 'player_finished', player_id: 'o1', place: 1, wpm: 61.5, accuracy: 100, valid: true })
+    ws.push({
+      type: 'player_finished',
+      player_id: 'o1',
+      place: 1,
+      wpm: 61.5,
+      accuracy: 100,
+      valid: true,
+      duration_ms: 6800,
+      reason: null,
+    })
     await waitFor(() => expect(screen.getByTestId('player-o1')).toHaveTextContent('#1 · 61.5 wpm'))
 
     ws.push({
       type: 'race_over',
       results: [
-        { player_id: 'o1', display_name: 'Sami', place: 1, wpm: 61.5, accuracy: 100, valid: true, dnf: false },
-        { player_id: 'me', display_name: 'Nell', place: null, wpm: null, accuracy: null, valid: null, dnf: true },
+        { player_id: 'o1', display_name: 'Sami', place: 1, wpm: 61.5, accuracy: 100, valid: true, duration_ms: 6800, reason: null, dnf: false },
+        { player_id: 'me', display_name: 'Nell', place: null, wpm: null, accuracy: null, valid: null, duration_ms: null, reason: null, dnf: true },
       ],
     })
 
@@ -247,39 +256,42 @@ describe('room page', () => {
     expect(screen.getByTestId('bar-me')).toHaveAttribute('dir', dir)
   })
 
-  it('explains why my run was not counted, from my history', async () => {
+  it("shows every player's exact time and why another player's run was not counted", async () => {
     const startedAt = new Date(Date.now() - 5000).toISOString()
-    vi.mocked(fetch).mockImplementation(((url: string) => {
-      if (url.includes('/me/sessions'))
-        return Promise.resolve(
-          json({
-            items: [
-              { id: 's9', mode: 'race', language: 'en', is_valid: false, invalid_reason: 'median_gap_too_low',
-                duration_ms: 1234, created_at: new Date().toISOString(), wpm: 300, accuracy: 100 },
-            ],
-            next_cursor: null,
-          }),
-        )
-      if (url.includes('/auth/me')) return Promise.resolve(json(ME))
-      return Promise.resolve(json({ access_token: 'tok', token_type: 'bearer', expires_in: 900 }))
-    }) as typeof fetch)
     const ws = await openRoom()
     ws.push({ type: 'countdown', text: TEXT, starts_at: startedAt })
     ws.push({ type: 'started', started_at: startedAt })
-    ws.push({ type: 'player_finished', player_id: 'me', place: null, wpm: 300, accuracy: 100, valid: false })
+    ws.push({
+      type: 'player_finished',
+      player_id: 'o1',
+      place: null,
+      wpm: 300,
+      accuracy: 100,
+      valid: false,
+      duration_ms: 1234,
+      reason: 'median_gap_too_low',
+    })
     ws.push({
       type: 'race_over',
       results: [
-        { player_id: 'me', display_name: 'Nell', place: null, wpm: 300, accuracy: 100, valid: false, dnf: false },
-        { player_id: 'o1', display_name: 'Sami', place: null, wpm: null, accuracy: null, valid: null, dnf: true },
+        { player_id: 'me', display_name: 'Nell', place: 1, wpm: 48.2, accuracy: 98, valid: true, duration_ms: 8650, reason: null, dnf: false },
+        { player_id: 'o1', display_name: 'Sami', place: null, wpm: 300, accuracy: 100, valid: false, duration_ms: 1234, reason: 'median_gap_too_low', dnf: false },
       ],
     })
 
-    const row = await screen.findByTestId('result-me')
-    expect(row).toHaveTextContent('not counted')
-    expect(await within(row).findByTestId('result-reason')).toHaveTextContent('faster than a person can sustain')
-    expect(row).toHaveTextContent('1.2s') // my time is the server's, exact
-    expect(screen.getByTestId('result-o1')).toHaveTextContent('did not finish')
+    // Another player's refusal, with the reason and their time, both from the server (ADR-033).
+    const theirs = await screen.findByTestId('result-o1')
+    expect(theirs).toHaveTextContent('not counted')
+    expect(within(theirs).getByTestId('result-reason-o1')).toHaveTextContent('faster than a person can sustain')
+    expect(theirs).toHaveTextContent('1.2s')
+    const mine = screen.getByTestId('result-me')
+    expect(mine).toHaveTextContent('counted')
+    expect(mine).not.toHaveTextContent('not counted')
+    expect(mine).toHaveTextContent('8.7s')
+    expect(within(mine).queryByTestId('result-reason-me')).not.toBeInTheDocument()
+    // No estimates, and no second request to piece my own run together.
+    expect(screen.getByRole('region', { name: 'results' })).not.toHaveTextContent('≈')
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/me/sessions'))).toBe(false)
     expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument()
   })

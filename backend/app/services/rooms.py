@@ -74,6 +74,9 @@ class Player:
     wpm: float | None = None
     accuracy: float | None = None
     valid: bool | None = None
+    # The server's time for the run and, if the validator refused it, why (§4).
+    duration_ms: int | None = None
+    reason: str | None = None
     # Which socket is this player's current one (ADR-031). A second tab for the same
     # account takes over; closing the old tab then no longer marks the player gone.
     conn: str | None = None
@@ -666,6 +669,8 @@ class RoomService:
             except sessions.SessionRejectedError as exc:
                 raise RoomError("invalid_session", str(exc)) from exc
         place: int | None = None
+        # Only a refused run carries a reason; a flagged one counted (ADR-033).
+        reason = None if row.is_valid else row.invalid_reason
         if row.is_valid:
             # HINCRBY is atomic: two replicas can never hand out the same place.
             place = int(await self.redis.hincrby(self.room_key(code), "places", 1))
@@ -679,6 +684,8 @@ class RoomService:
                 "wpm": row.wpm,
                 "accuracy": row.accuracy,
                 "valid": row.is_valid,
+                "duration_ms": row.duration_ms,
+                "reason": reason,
                 "typed": len(text.content_normalized),
             },
         )
@@ -691,6 +698,8 @@ class RoomService:
                 "wpm": row.wpm,
                 "accuracy": row.accuracy,
                 "valid": row.is_valid,
+                "duration_ms": row.duration_ms,
+                "reason": reason,
             },
         )
         if await self.redis.hsetnx(self.room_key(code), "first_finish_at", _iso(now)):
@@ -730,6 +739,8 @@ class RoomService:
                 "wpm": p.wpm,
                 "accuracy": p.accuracy,
                 "valid": p.valid,
+                "duration_ms": p.duration_ms,
+                "reason": p.reason,
                 "dnf": p.finished_at is None,
             }
             for p in ordered

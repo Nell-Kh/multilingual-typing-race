@@ -58,8 +58,9 @@ Redis TTLs enforce this; nothing else has to clean up.
   token's expiry and a logout on another tab. That is acceptable for a room that
   lives minutes (a race is capped at 5), and the next connection is checked again;
   it would not be for a long-lived channel.
-- All frames are JSON objects with a `type` field. Unknown types are ignored
-  (forward compatibility); malformed JSON closes the socket with `4400`.
+- All frames are JSON objects with a `type` field. Unknown types and unknown
+  fields are ignored (forward compatibility, §10); malformed JSON closes the
+  socket with `4400`.
 
 Rooms are created over plain HTTP so the client has a code to connect to:
 
@@ -85,19 +86,23 @@ Rooms are created over plain HTTP so the client has a code to connect to:
 
 | type | payload | sent |
 |---|---|---|
-| `room` | full snapshot: `{code, state, language, difficulty, max_players, host_id, text?, starts_at?, players: [{id, display_name, connected, typed, errors, finished_at?, result?}]}` | after `auth`, and after every reconnect |
+| `room` | full snapshot: `{code, state, language, difficulty, max_players, host_id, text?, starts_at?, players: [{id, display_name, connected, typed, errors, finished_at?, place?, wpm?, accuracy?, valid?, duration_ms?, reason?}]}` | after `auth`, and after every reconnect |
 | `player_joined` / `player_left` | `{player}` / `{player_id}` | lobby changes |
 | `player_connection` | `{player_id, connected}` | a socket drops or comes back mid-race |
 | `host_changed` | `{host_id}` | host handoff (§6) |
 | `countdown` | `{text: {id, content, char_count}, starts_at: iso}` | host pressed start |
 | `started` | `{started_at: iso}` | `starts_at` passed; input unlocks |
 | `progress` | `{player_id, typed, errors}` | relayed to everyone else, throttled to 5/s per player |
-| `player_finished` | `{player_id, place, wpm, accuracy, valid}` | a `finish` was scored |
-| `race_over` | `{results: [{player_id, place, wpm, accuracy, valid, dnf}]}` | the race ended (§5) |
+| `player_finished` | `{player_id, place, wpm, accuracy, valid, duration_ms, reason}` | a `finish` was scored |
+| `race_over` | `{results: [{player_id, place, wpm, accuracy, valid, duration_ms, reason, dnf}]}` | the race ended (§5) |
 | `error` | `{code, message}` | e.g. `not_host`, `room_full`, `wrong_state`, `already_finished` |
 
 `place` is assigned in the order valid `finish` frames **arrive at the server**,
 never from client timestamps.
+
+`duration_ms` is the run's recorded duration, the number WPM is computed from
+(§5); `reason` is the validator's code when the run was refused (`valid: false`)
+and `null` otherwise. A player who did not finish has both `null` (ADR-033).
 
 ## 5. Timing and scoring
 
@@ -190,3 +195,13 @@ in-process timer disabled. Service-level tests (`test_room_state.py`) drive a
 second `RoomService` instance through a room it never armed a timer for, and
 five concurrent ticks through one transition. Frontend: the lobby and race screens are tested against a fake
 socket that replays the frames above.
+
+## 10. Versioning
+
+Frames carry no version number. Compatibility is by addition only: new frame
+types and new fields may appear, existing ones keep their name, type and meaning,
+and clients ignore what they do not know (§3). A change that cannot be made that
+way needs a new endpoint, not a quiet change to this one.
+
+- 2026-09-29: `duration_ms` and `reason` added to `player_finished`, to each
+  `race_over.results` row and to each player in `room` (ADR-033).

@@ -129,6 +129,8 @@ export function reduceRoom(view: RoomView, action: RoomAction): RoomView {
           wpm: f.wpm,
           accuracy: f.accuracy,
           valid: f.valid,
+          duration_ms: f.duration_ms,
+          reason: f.reason,
           typed: view.text?.char_count ?? 0,
         }),
       }
