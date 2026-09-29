@@ -17,6 +17,12 @@ export interface RoomView {
   text: RaceText | null
   startsAt: string | null
   startedAt: string | null
+  /**
+   * When `started` reached this browser, on this browser's clock. Other players'
+   * finish times are measured against it, so clock skew between us and the server
+   * does not enter; after a reconnect mid-race it falls back to the server's time.
+   */
+  startedSeenAt: string | null
   players: RoomPlayer[]
   results: RaceResultRow[] | null
   /** Last error frame from the server, cleared by the next successful frame. */
@@ -39,6 +45,7 @@ export function initialRoom(): RoomView {
     text: null,
     startsAt: null,
     startedAt: null,
+    startedSeenAt: null,
     players: [],
     results: null,
     error: null,
@@ -69,6 +76,7 @@ export function reduceRoom(view: RoomView, action: RoomAction): RoomView {
         text: f.text,
         startsAt: f.starts_at,
         startedAt: f.started_at,
+        startedSeenAt: f.started_at ? (view.startedSeenAt ?? f.started_at) : null,
         players: f.players,
         results: f.state === 'finished' ? view.results : null,
         error: null,
@@ -91,6 +99,7 @@ export function reduceRoom(view: RoomView, action: RoomAction): RoomView {
         text: f.text,
         startsAt: f.starts_at,
         startedAt: null,
+        startedSeenAt: null,
         results: null,
         error: null,
         players: view.players.map((p) => ({
@@ -105,7 +114,7 @@ export function reduceRoom(view: RoomView, action: RoomAction): RoomView {
         })),
       }
     case 'started':
-      return { ...view, state: 'running', startedAt: f.started_at }
+      return { ...view, state: 'running', startedAt: f.started_at, startedSeenAt: new Date().toISOString() }
     case 'progress':
       return {
         ...view,

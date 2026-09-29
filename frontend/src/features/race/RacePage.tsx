@@ -3,6 +3,8 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { LANGUAGES, LANGUAGE_CODES, loadPracticeLanguage } from '../../i18n/languages'
 import { ApiError, rooms, type Language } from '../../lib/api'
+import { Button } from '../../ui/Button'
+import { Segmented } from '../../ui/Segmented'
 import { useTitle } from '../../ui/useTitle'
 
 type Difficulty = 1 | 2 | 3
@@ -27,83 +29,75 @@ export default function RacePage() {
   }
 
   return (
-    <main className="flex flex-col gap-8 p-4 sm:p-8">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Race</h1>
+    <main className="flex flex-col gap-5 p-4 sm:gap-6 sm:p-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="m-0 text-2xl font-bold sm:text-3xl">Race</h1>
+        <p className="m-0 text-sm text-muted">
+          Up to five friends, one text, places decided by the server from each keystroke log.
+        </p>
       </header>
 
-      <section className="flex flex-col gap-4 rounded-lg border p-6" aria-labelledby="create-heading">
-        <h2 id="create-heading" className="text-lg font-semibold">
-          Open a room
-        </h2>
-        <div className="flex items-center gap-3" role="group" aria-label="Language">
-          <span className="text-sm">Language</span>
-          {LANGUAGE_CODES.map((c) => (
-            <button
-              key={c}
-              type="button"
-              lang={c}
-              onClick={() => setLanguage(c)}
-              className={`rounded border min-w-11 px-3 py-2 ${c === language ? 'bg-blue-600 text-white' : ''}`}
-              aria-pressed={c === language}
-            >
-              {LANGUAGES[c].label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3" role="group" aria-label="Difficulty">
-          <span className="text-sm">Difficulty</span>
-          {([1, 2, 3] as const).map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDifficulty(d)}
-              className={`rounded border min-w-11 px-3 py-2 ${d === difficulty ? 'bg-blue-600 text-white' : ''}`}
-              aria-pressed={d === difficulty}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => create.mutate()}
-          disabled={create.isPending}
-          className="self-start rounded bg-blue-600 px-6 py-3 text-lg text-white disabled:opacity-50"
+      <div className="grid gap-4 md:grid-cols-2">
+        <section
+          className="flex flex-col gap-4 rounded-card border border-line bg-surface p-5 sm:p-6"
+          aria-labelledby="create-heading"
         >
-          Create room
-        </button>
-        {create.isError && (
-          <p role="alert" className="text-sm text-red-600">
-            {create.error instanceof ApiError ? create.error.message : 'Could not create a room'}
-          </p>
-        )}
-      </section>
-
-      <form onSubmit={join} className="flex flex-col gap-4 rounded-lg border p-6" aria-labelledby="join-heading">
-        <h2 id="join-heading" className="text-lg font-semibold">
-          Join a room
-        </h2>
-        <label className="flex flex-col gap-1">
-          <span className="text-sm">Room code</span>
-          <input
-            className="rounded border px-3 py-2 font-mono text-xl uppercase tracking-widest"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            maxLength={6}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="ABC123"
+          <h2 id="create-heading" className="m-0 text-lg font-bold">
+            Open a room
+          </h2>
+          <Segmented
+            label="Language"
+            value={language}
+            onChange={setLanguage}
+            options={LANGUAGE_CODES.map((c) => ({ value: c, label: LANGUAGES[c].label, lang: c }))}
           />
-        </label>
-        <button
-          type="submit"
-          disabled={code.trim().length !== 6}
-          className="self-start rounded border px-6 py-3 text-lg disabled:opacity-50"
+          <Segmented
+            label="Difficulty"
+            value={difficulty}
+            onChange={setDifficulty}
+            options={([1, 2, 3] as const).map((d) => ({ value: d, label: d }))}
+          />
+          <div>
+            <Button variant="primary" onClick={() => create.mutate()} disabled={create.isPending} className="min-h-11 px-6">
+              {create.isPending ? 'Opening…' : 'Create room'}
+            </Button>
+          </div>
+          {create.isError && (
+            <p role="alert" className="m-0 text-sm text-err">
+              {create.error instanceof ApiError ? create.error.message : 'Could not create a room'}
+            </p>
+          )}
+        </section>
+
+        <form
+          onSubmit={join}
+          className="flex flex-col gap-4 rounded-card border border-line bg-surface p-5 sm:p-6"
+          aria-labelledby="join-heading"
         >
-          Join
-        </button>
-      </form>
+          <h2 id="join-heading" className="m-0 text-lg font-bold">
+            Join a room
+          </h2>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Room code</span>
+            <input
+              className="min-h-12 rounded-control border border-line bg-surface px-3 font-mono text-2xl tracking-[0.2em] uppercase
+                focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              maxLength={6}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="ABC123"
+            />
+          </label>
+          <p className="m-0 text-sm text-muted">The six letters the host shares with you.</p>
+          <div>
+            <Button type="submit" disabled={code.trim().length !== 6} className="min-h-11 px-6">
+              Join
+            </Button>
+          </div>
+        </form>
+      </div>
     </main>
   )
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { LeaderboardRow, SessionResult } from '../../lib/api'
 import { Button } from '../../ui/Button'
 import { StatStrip } from '../../ui/StatStrip'
+import { reasonText } from './reasons'
 
 interface Props {
   result: SessionResult
@@ -11,18 +12,6 @@ interface Props {
   onRetry: () => void
   /** Daily only: the daily board's link and the player's row on it, if any. */
   daily?: { href: string; me: LeaderboardRow | null | undefined }
-}
-
-/** Why the server did not count a run, in words a player can act on. */
-const REASONS: Record<string, string> = {
-  empty_log: 'No keystrokes arrived with the run.',
-  text_mismatch: "What was typed doesn't match the text.",
-  median_gap_too_low: 'Typing was faster than a person can sustain.',
-  machine_run: 'A burst of keys arrived too fast to be typed by hand.',
-  too_few_keystrokes: 'Fewer keystrokes than characters in the text.',
-  time_not_monotonic: 'Keystroke times went backwards.',
-  duration_disagrees_with_server: "The run's length doesn't match what the server measured.",
-  flagged_for_review: 'Very high speed, so it is kept for review.',
 }
 
 function duration(ms: number): string {
@@ -61,7 +50,7 @@ export function ResultsCard({ result, onNext, onRetry, daily }: Props) {
 
       {(!result.is_valid || flagged) && result.invalid_reason && (
         <p role={result.is_valid ? undefined : 'alert'} className={`m-0 text-sm ${result.is_valid ? 'text-muted' : 'text-err'}`}>
-          {REASONS[result.invalid_reason] ?? result.invalid_reason}
+          {reasonText(result.invalid_reason)}
         </p>
       )}
 
