@@ -26,7 +26,8 @@ export async function register(page: Page, name: string, email: string): Promise
 export async function typeTheWholeText(page: Page, delay = KEY_DELAY_MS): Promise<string> {
   const box = page.getByTestId('typing-box')
   await expect(box).toBeVisible()
-  const target = await box.innerText()
+  // The box holds display-only zero-width joiners between Arabic letters (ADR-036); nobody types those.
+  const target = (await box.innerText()).replaceAll('\u200d', '')
   expect(target.length).toBeGreaterThan(10)
   await page.getByRole('textbox', { name: 'Type the text above' }).click()
   await page.keyboard.type(target, { delay })

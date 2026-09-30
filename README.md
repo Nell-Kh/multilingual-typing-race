@@ -22,7 +22,7 @@ A real-time typing trainer and race for Hebrew, Arabic and English. The browser 
 - **Real-time races** of up to 5 players, joined by a room code: server countdown, live progress bars, places decided by the server.
 - **Racing alone**: a pacer at 40, 60 or 80 WPM on any practice text, and on the daily, a ghost of today's #1 replayed from their key timings.
 - **Daily challenge**: one text per language, the same for everyone, new at midnight Israel time, with its own board.
-- **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss on your own keyboard layout.
+- **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss, drawn on the standard computer layout for each language.
 - **Leaderboards** per language — all-time, weekly and daily — with tied speeds sharing a rank and your own row pinned when you are outside the top.
 - **Light and dark mode**, following the system setting.
 - **Works on a 360px phone**, right to left as well as left to right.
@@ -31,12 +31,12 @@ Status: **v1.1 — complete.**
 
 ## Engineering highlights
 
-- **220 backend tests** (pytest against a real PostgreSQL and Redis) and **125 frontend tests** (Vitest + Testing Library).
+- **220 backend tests** (pytest against a real PostgreSQL and Redis) and **131 frontend tests** (Vitest + Testing Library).
 - **5 end-to-end tests in 3 Playwright specs**, run in CI against the built frontend and a real API — including a whole race between two browsers, and a visitor trying it without an account.
 - **The server is the judge**: seven validation rules on every log (empty, too few keystrokes, replay does not reproduce the text, time running backwards, median gap under 30 ms, 10+ keys at machine speed, and in a race a duration that disagrees with the server's clock by over 1.5 s), plus a review flag above 250 WPM.
 - **Race state that survives restarts, double starts and second tabs**: rooms live in Redis, every transition is a Lua compare-and-set, and timed transitions are applied by whichever server next looks at the room ([ADR-031](docs/DECISIONS.md)).
-- **Hebrew and Arabic by design**: import-time normalization of niqqud, tashkeel and typographic punctuation; one span per character with the browser keeping Arabic joined ([docs/rtl-notes.md](docs/rtl-notes.md)).
-- **35 architecture decision records**, each with its context, decision and cost: [docs/DECISIONS.md](docs/DECISIONS.md).
+- **Hebrew and Arabic by design**: import-time normalization of niqqud, tashkeel and typographic punctuation; one span per run of same-status letters, with zero-width joiners so Arabic stays joined in Safari too ([ADR-036](docs/DECISIONS.md), [docs/rtl-notes.md](docs/rtl-notes.md)).
+- **36 architecture decision records**, each with its context, decision and cost: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Screenshots
 
@@ -44,7 +44,7 @@ A visitor with no account: "Try it now" on the landing page, Arabic, the 60 WPM 
 
 ![A guest run in Arabic against the 60 WPM pacer: the landing page, Try it now, two race rows filling from the right as the sentence turns green, and the server's result marked valid and not saved](docs/img/guest-pacer-arabic.gif)
 
-Practising in Arabic, mid-run (typed by a script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ش of أشعلنا — and it stays joined to the ع after it, because the renderer is one `<span>` per character and the shaping is the browser's job (ADR-014). A wrong letter is marked by background as well as colour (ADR-032).
+Practising in Arabic, mid-run (typed by a script, with deliberate mistakes). Green is behind the caret; the red letter on a pink cell is the one typed wrong — the ش of أشعلنا — and it stays joined to the ع after it: letters with the same status share one span, and a zero-width joiner holds the letters together across each break, in Chrome and in Safari alike (ADR-036). A wrong letter is marked by background as well as colour (ADR-032).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/img/practice-arabic-dark.png">
@@ -86,13 +86,13 @@ The same formulas apply to all three languages. A session is stored as invalid �
 
 Typing trainers are built for Latin scripts, and the assumptions leak. Hebrew and Arabic arrive with vowel marks the keyboard cannot produce, with typographic punctuation that is not the punctuation on the key, and with letters that look the same to a reader and are different characters to a computer — ך and כ, أ and ا. Arabic letters change shape depending on their neighbours, so a renderer that draws one character at a time breaks the word. Every text here is normalized once at import so that what is displayed is exactly what a keyboard can produce, and the renderer keeps the shaping intact ([docs/rtl-notes.md](docs/rtl-notes.md)).
 
-What you see is what you type: every text is normalized once at import (niqqud and tashkeel stripped, typographic punctuation mapped to the keys on the SI-1452 / Arabic 101 layouts, letters matched strictly — ך ≠ כ, أ ≠ ا) and the same string is displayed and validated. The typing box renders one span per character in all three languages; browsers keep Arabic letters joined across spans as long as the font is identical, which we measured before deciding not to build a second renderer. Details, rules and the reasoning: [docs/rtl-notes.md](docs/rtl-notes.md).
+What you see is what you type: every text is normalized once at import (niqqud and tashkeel stripped, typographic punctuation mapped to the keys on the SI-1452 / Arabic 101 layouts, letters matched strictly — ך ≠ כ, أ ≠ ا) and the same string is displayed and validated. The typing box renders one span per run of same-status letters in all three languages, with a zero-width joiner where a break falls between two connecting Arabic letters, because Safari does not shape across elements (ADR-036). Details, rules and the reasoning: [docs/rtl-notes.md](docs/rtl-notes.md).
 
 ## How it fits together
 
 ```mermaid
 flowchart LR
-    B["Browser<br/>React 19 · typing engine<br/>one span per character"]
+    B["Browser<br/>React 19 · typing engine<br/>spans per status run"]
     W["nginx<br/>static bundle"]
     A["FastAPI<br/>async SQLAlchemy<br/>scoring · validation"]
     A2["another API replica"]
@@ -161,7 +161,7 @@ cd frontend && npm install
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-**220 backend tests** (pytest, against a real PostgreSQL and Redis), **125 frontend tests**
+**220 backend tests** (pytest, against a real PostgreSQL and Redis), **131 frontend tests**
 (Vitest + Testing Library) and **5 end-to-end tests** that boot the stack and drive the
 built frontend with Playwright, one a whole race between two browsers and one a visitor trying it without an account. All three
 suites run in CI on every pull request ([e2e/README.md](e2e/README.md)).

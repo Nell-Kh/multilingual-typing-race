@@ -32,15 +32,22 @@ we simply do not author them. The English corpus stays ASCII-only.
 
 ## 2. Rendering (ADR-014)
 
-The typing box renders **one `<span>` per character**, the same as for English.
+The typing box renders **one `<span>` per run of characters with the same status**
+— typed, the one wrong letter, the caret letter, the rest — the same as for English.
+Where a break falls between two Arabic letters that connect, both sides carry a
+zero-width joiner (U+200D). ADR-036 explains why; the history is below.
 
 The M2 plan assumed this would break Arabic letter joining and planned an overlay
 renderer (whole-word text nodes + caret positioned by `Range.getBoundingClientRect`).
 We tested before building it: Chromium shapes cursive text across inline element
 boundaries as long as every span has the same font properties, and a per-character
 Arabic sentence renders pixel-identical in width to the same sentence as one text
-node. Firefox has done the same for years, and WebKit fixed it for complex scripts
-in late 2025 (bug 6148). So the overlay renderer was never written.
+node. Firefox has done the same for years. We also believed WebKit had fixed it
+(bug 6148); it had not. Safari on macOS, in September 2026, and WebKitGTK 2.52
+both shape each element on its own, so one span per letter drew every Arabic letter
+in its isolated form there. That is what ADR-036 fixed: fewer spans, and a joiner
+across each remaining break between connecting letters. The overlay renderer was
+still never needed.
 
 What *does* differ per language:
 
@@ -55,10 +62,12 @@ What *does* differ per language:
 
 Rules that keep shaping intact — do not break them:
 
-1. All character spans share the same `font-family`, `font-size`, `font-weight`
-   and `font-style`. Colour, background, border and border-radius are fine.
-2. No `letter-spacing` on the typing text (it visibly breaks joins in every browser).
-3. No per-character `display: inline-block` (that *does* isolate each glyph).
+1. All spans share the same `font-family`, `font-size`, `font-weight` and
+   `font-style`. Colour, background, border and border-radius are fine.
+2. Keep spans to runs (`segments.ts`), and keep the joiners at breaks between
+   connecting letters; do not go back to one span per letter.
+3. No `letter-spacing` on the typing text (it visibly breaks joins in every browser).
+4. No `display: inline-block` on a span (that isolates its glyphs everywhere).
 
 ## 3. Layout
 
@@ -85,3 +94,7 @@ English `a` colour the same key.
 - The same for Hebrew (414 px), which has no joining but does have final forms.
 - Practice page screenshots in en/he/ar with a typo mid-sentence: red highlight
   and caret land on the right character in all three directions.
+- WebKitGTK 2.52 (Safari's engine family), September 2026: with one span per
+  letter, "السابعة" drew as six separate letters; with runs and joiners, the
+  word is joined, and so are the letters on both sides of the wrong letter and
+  the caret.

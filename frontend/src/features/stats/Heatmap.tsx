@@ -136,7 +136,8 @@ export function Heatmap({ language, keys }: Props) {
 
       <div className="flex flex-col gap-1.5 text-xs text-muted" data-testid="heatmap-legend">
         <span>
-          <span className="font-medium text-ink">{layout.name}</span> · share of presses missed
+          <span className="font-medium text-ink">{layout.name}</span>, the computer keyboard layout · share of presses
+          missed. Phone keyboards place some keys differently; the counts per character are the same.
         </span>
         <ul className="m-0 flex list-none flex-wrap items-center gap-x-3 gap-y-1.5 p-0">
           {BINS.map((b) => (

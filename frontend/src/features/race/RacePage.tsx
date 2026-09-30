@@ -33,7 +33,7 @@ export default function RacePage() {
       <header className="flex flex-col gap-1">
         <h1 className="m-0 text-2xl font-bold sm:text-3xl">Race</h1>
         <p className="m-0 text-sm text-muted">
-          Up to five friends, one text, places decided by the server from each keystroke log.
+          Up to five players, one text, places decided by the server from each keystroke log.
         </p>
       </header>
 

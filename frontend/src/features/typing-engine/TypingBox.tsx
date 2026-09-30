@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type CompositionEvent } 
 import { directionOf } from '../../i18n/languages'
 import type { Language } from '../../lib/api'
 import { charStatuses, type EngineState } from './engine'
+import { segments } from './segments'
 import { CARET, SIZE, STATUS_CLASS } from './styles'
 
 interface Props {
@@ -19,10 +20,11 @@ interface Props {
  * keyboard (so mobile keyboards, IME composition and accessibility all work); the
  * spans underneath show progress.
  *
- * One <span> per character works for Hebrew and Arabic too: browsers shape
- * cursive letters across inline boundaries as long as every span has the same
- * font (see ADR-014 and docs/rtl-notes.md). The only per-language differences
- * are `dir`, `lang` (which selects the font via CSS `:lang()`), and size.
+ * Letters with the same status share one span, and a zero-width joiner holds
+ * Arabic letters together across the few boundaries left, because Safari does not
+ * shape across elements (ADR-036, superseding the span-per-letter note in ADR-014).
+ * The only per-language differences are `dir`, `lang` (which selects the font via
+ * CSS `:lang()`), and size.
  */
 export function TypingBox({ state, language, onInput, locked = false, onRestart }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -75,19 +77,15 @@ export function TypingBox({ state, language, onInput, locked = false, onRestart 
         aria-hidden="true"
         className={`m-0 whitespace-pre-wrap break-words select-none ${waiting ? 'opacity-40' : ''}`}
       >
-        {Array.from(state.target).map((ch, i) => {
-          const status = statuses[i]
-          const caret = status === 'current' && !locked
-          return (
-            <span
-              key={i}
-              data-caret={caret || undefined}
-              className={`${STATUS_CLASS[status]} ${caret ? CARET[dir] : ''}`}
-            >
-              {ch}
-            </span>
-          )
-        })}
+        {segments(Array.from(state.target), statuses, locked ? null : statuses.indexOf('current')).map((seg) => (
+          <span
+            key={seg.start}
+            data-caret={seg.caret || undefined}
+            className={`${STATUS_CLASS[seg.status]} ${seg.caret ? CARET[dir] : ''}`}
+          >
+            {seg.text}
+          </span>
+        ))}
       </p>
       {waiting && (
         <div
