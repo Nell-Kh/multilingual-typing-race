@@ -22,7 +22,7 @@ A real-time typing trainer and race for Hebrew, Arabic and English. The browser 
 - **Real-time races** of up to 5 players, joined by a room code: server countdown, live progress bars, places decided by the server.
 - **Racing alone**: a pacer at 40, 60 or 80 WPM on any practice text, and on the daily, a ghost of today's #1 replayed from their key timings.
 - **Daily challenge**: one text per language, the same for everyone, new at midnight Israel time, with its own board.
-- **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss on your own keyboard layout.
+- **Stats** per language: best and average speed, accuracy, history, a speed chart with a 7-run average, and a heatmap of the keys you miss, drawn on the standard computer layout for each language.
 - **Leaderboards** per language — all-time, weekly and daily — with tied speeds sharing a rank and your own row pinned when you are outside the top.
 - **Light and dark mode**, following the system setting.
 - **Works on a 360px phone**, right to left as well as left to right.
