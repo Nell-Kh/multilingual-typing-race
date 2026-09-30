@@ -34,7 +34,7 @@ describe('TypingBox', () => {
   it.each([
     ['he', 'שלום עולם'],
     ['ar', 'مرحبا بكم'],
-  ] as const)('renders %s right-to-left with one span per character', (language, target) => {
+  ] as const)('renders %s right-to-left, the whole text in order', (language, target) => {
     render(<Harness target={target} language={language} />)
 
     const box = screen.getByTestId('typing-box')
@@ -42,9 +42,9 @@ describe('TypingBox', () => {
     expect(box).toHaveAttribute('lang', language)
     expect(screen.getByRole('textbox')).toHaveAttribute('dir', 'rtl')
 
-    const spans = box.querySelectorAll('p > span')
-    expect(spans).toHaveLength(Array.from(target).length)
-    expect(Array.from(spans, (s) => s.textContent).join('')).toBe(target)
+    // The text is all there once the display-only joiners are taken out (ADR-036).
+    const text = Array.from(box.querySelectorAll('p > span'), (s) => s.textContent).join('')
+    expect(text.replaceAll('\u200d', '')).toBe(target)
   })
 
   it('marks Arabic letters correct as they are typed and stops at a mistake', async () => {
@@ -53,13 +53,20 @@ describe('TypingBox', () => {
     const spans = () => Array.from(screen.getByTestId('typing-box').querySelectorAll('p > span'))
 
     await user.type(screen.getByRole('textbox'), 'مر')
+    // Typed letters share one span; the caret letter has its own.
     expect(spans()[0]).toHaveClass('text-ok')
-    expect(spans()[1]).toHaveClass('text-ok')
-    expect(spans()[2]).toHaveAttribute('data-caret') // the caret
+    expect(spans()[0].textContent).toBe('مر')
+    expect(spans()[1]).toHaveAttribute('data-caret')
+    // ر never connects forward, so no joiner before ح; ح connects to the ب after it.
+    expect(spans()[1].textContent).toBe('ح\u200d')
 
     await user.type(screen.getByRole('textbox'), 'ب') // should have been ح
     // Wrong is a background and a colour, never colour alone (ADR-032).
-    expect(spans()[2]).toHaveClass('bg-err-soft', 'text-err')
+    expect(spans()[1]).toHaveClass('bg-err-soft', 'text-err')
+    // ح connects to the ب after it: the joiner keeps them joined across the span break.
+    expect(spans()[1].textContent).toBe('ح\u200d')
+    expect(spans()[2].textContent).toBe('\u200dب\u200d') // the caret letter, joined on both sides
+    expect(spans()[3].textContent).toBe('\u200dا')
     expect(screen.getByRole('textbox')).toHaveValue('مرب')
 
     await user.type(screen.getByRole('textbox'), 'ح') // ignored: cannot type past a mistake
